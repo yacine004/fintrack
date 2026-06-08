@@ -1,10 +1,17 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Login from './pages/Login'
-import RafDashboard from './pages/raf/Dashboard'
-import RafUtilisateurs from './pages/raf/Utilisateurs'
-import RafProfil from './pages/raf/Profil'
+
+// ── Sprint 1 ──
+import Login              from './pages/Login'
+import RafDashboard       from './pages/raf/Dashboard'
+import RafUtilisateurs    from './pages/raf/Utilisateurs'
+import RafProfil          from './pages/raf/Profil'
 import ComptableDashboard from './pages/comptable/Dashboard'
-import ComptableProfil from './pages/comptable/Profil'
+import ComptableProfil    from './pages/comptable/Profil'
+
+// ── Sprint 2 ──
+import RafEtudiants       from './pages/raf/Etudiants'
+import RafCaisses         from './pages/raf/Caisses'
+import ComptableEtudiants from './pages/comptable/Etudiants'
 
 function PrivateRoute({ children, role }) {
   const user  = JSON.parse(localStorage.getItem('user') || 'null')
@@ -20,7 +27,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Login />} />
 
-        {/* RAF */}
+        {/* ── RAF ── */}
         <Route path="/raf/dashboard" element={
           <PrivateRoute role="raf"><RafDashboard /></PrivateRoute>
         }/>
@@ -30,13 +37,24 @@ export default function App() {
         <Route path="/raf/profil" element={
           <PrivateRoute role="raf"><RafProfil /></PrivateRoute>
         }/>
+        {/* Sprint 2 */}
+        <Route path="/raf/etudiants" element={
+          <PrivateRoute role="raf"><RafEtudiants /></PrivateRoute>
+        }/>
+        <Route path="/raf/caisses" element={
+          <PrivateRoute role="raf"><RafCaisses /></PrivateRoute>
+        }/>
 
-        {/* COMPTABLE */}
+        {/* ── COMPTABLE ── */}
         <Route path="/comptable/dashboard" element={
           <PrivateRoute role="comptable"><ComptableDashboard /></PrivateRoute>
         }/>
         <Route path="/comptable/profil" element={
           <PrivateRoute role="comptable"><ComptableProfil /></PrivateRoute>
+        }/>
+        {/* Sprint 2 */}
+        <Route path="/comptable/etudiants" element={
+          <PrivateRoute role="comptable"><ComptableEtudiants /></PrivateRoute>
         }/>
       </Routes>
     </BrowserRouter>
