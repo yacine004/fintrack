@@ -9,9 +9,10 @@ load_dotenv()
 from extensions import db, bcrypt, jwt
 from routes.auth import auth_bp
 from routes.utilisateurs import utilisateurs_bp
-# ── Sprint 2 ──
 from routes.etudiants import etudiants_bp
 from routes.caisses import caisses_bp
+# ── Sprint 3 ──
+from routes.paiements import paiements_bp
 
 
 def create_app():
@@ -34,13 +35,14 @@ def create_app():
     bcrypt.init_app(app)
     jwt.init_app(app)
 
-    # ── Blueprints Sprint 1 ──
+    # Sprint 1
     app.register_blueprint(auth_bp,         url_prefix='/api/auth')
     app.register_blueprint(utilisateurs_bp, url_prefix='/api/utilisateurs')
-
-    # ── Blueprints Sprint 2 ──
+    # Sprint 2
     app.register_blueprint(etudiants_bp,    url_prefix='/api/etudiants')
     app.register_blueprint(caisses_bp,      url_prefix='/api/caisses')
+    # Sprint 3
+    app.register_blueprint(paiements_bp,    url_prefix='/api/paiements')
 
     return app
 
@@ -55,26 +57,19 @@ if __name__ == '__main__':
         from models import Utilisateur
         if db.session.query(Utilisateur).count() == 0:
             users = [
-                Utilisateur(
-                    nom='Diop', prenom='Moussa',
-                    email='raf@fintrack.sn',
-                    contact='77 000 00 01',
-                    mot_de_passe_hash=bcrypt.generate_password_hash('raf123').decode(),
-                    role='raf'
-                ),
-                Utilisateur(
-                    nom='Diallo', prenom='Abdoul Salif',
-                    email='comptable@fintrack.sn',
-                    contact='77 000 00 02',
-                    mot_de_passe_hash=bcrypt.generate_password_hash('comptable123').decode(),
-                    role='comptable'
-                ),
+                Utilisateur(nom='Diop', prenom='Moussa', email='raf@fintrack.sn',
+                            contact='77 000 00 01',
+                            mot_de_passe_hash=bcrypt.generate_password_hash('raf123').decode(),
+                            role='raf'),
+                Utilisateur(nom='Diallo', prenom='Abdoul Salif', email='comptable@fintrack.sn',
+                            contact='77 000 00 02',
+                            mot_de_passe_hash=bcrypt.generate_password_hash('comptable123').decode(),
+                            role='comptable'),
             ]
             db.session.add_all(users)
             db.session.commit()
-            print("✅ Comptes de test créés")
+            print("✅ Comptes créés")
 
-        # Données de test Sprint 2
         from models import Etudiant, Caisse
         if db.session.query(Etudiant).count() == 0:
             etudiants = [
@@ -96,22 +91,19 @@ if __name__ == '__main__':
             ]
             db.session.add_all(etudiants)
             db.session.commit()
-            print("✅ Étudiants de test créés")
+            print("✅ Étudiants créés")
 
         if db.session.query(Caisse).count() == 0:
             caisses = [
                 Caisse(nom='Caisse Principale', type_caisse='principale',
-                       description='Caisse principale de l\'école',
-                       solde_actuel=5000000.00),
+                       description='Caisse principale de l\'école', solde_actuel=5000000.00),
                 Caisse(nom='Caisse Scolarité', type_caisse='secondaire',
-                       description='Paiements des frais de scolarité',
-                       solde_actuel=2500000.00),
+                       description='Paiements des frais de scolarité', solde_actuel=2500000.00),
                 Caisse(nom='Caisse Projets', type_caisse='projet',
-                       description='Financement des projets étudiants',
-                       solde_actuel=750000.00),
+                       description='Financement des projets étudiants', solde_actuel=750000.00),
             ]
             db.session.add_all(caisses)
             db.session.commit()
-            print("✅ Caisses de test créées")
+            print("✅ Caisses créées")
 
     app.run(debug=True, port=5000)
