@@ -12,10 +12,13 @@ def login():
     email    = data.get('email', '').strip().lower()
     password = data.get('password', '')
 
-    user = db.session.query(Utilisateur).filter_by(email=email, actif=True).first()
+    user = db.session.query(Utilisateur).filter_by(email=email).first()
 
     if not user or not bcrypt.check_password_hash(user.mot_de_passe_hash, password):
         return jsonify({'message': 'Email ou mot de passe incorrect'}), 401
+
+    if not user.actif:
+        return jsonify({'message': 'Compte inactif. Contactez votre administrateur.'}), 401
 
     token = create_access_token(
         identity=str(user.id_utilisateur),
@@ -29,7 +32,6 @@ def login():
             }
         }
     )
-
     return jsonify({'token': token, 'user': user.to_dict()}), 200
 
 # ── GET PROFIL ────────────────────────────────────────────────────────────────

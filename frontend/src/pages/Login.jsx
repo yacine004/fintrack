@@ -19,8 +19,8 @@ export default function Login() {
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('user', JSON.stringify(res.data.user))
       navigate(res.data.user.role === 'raf' ? '/raf/dashboard' : '/comptable/dashboard')
-    } catch {
-      setError('Email ou mot de passe incorrect.')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Email ou mot de passe incorrect.')
     } finally {
       setLoading(false)
     }
