@@ -1,87 +1,119 @@
+import { useState, useEffect } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+         ResponsiveContainer } from 'recharts'
 import Sidebar from '../../components/Sidebar'
-import KpiCard from '../../components/KpiCard'
 
-const paiements = [
-  { heure:'10h32', etudiant:'Diallo Amadou', montant:'+250 000', mode:'Espèces', statut:'Validé' },
-  { heure:'09h15', etudiant:'Ba Yacine', montant:'+125 000', mode:'Wave', statut:'Validé' },
-  { heure:'08h50', etudiant:'Koné Bakary', montant:'+250 000', mode:'Orange Money', statut:'Validé' },
-]
+const API = 'http://localhost:5000/api'
+const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${localStorage.getItem('token')}`
+})
 
 export default function ComptableDashboard() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const [data, setData]       = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const res  = await fetch(`${API}/dashboard`, { headers: getHeaders() })
+        const json = await res.json()
+        if (res.ok) setData(json)
+      } catch {}
+      finally { setLoading(false) }
+    }
+    fetchDashboard()
+  }, [])
+
+  const fmt = (n) => Number(n || 0).toLocaleString('fr-FR')
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#F1F5F9', fontFamily: 'Inter, Arial, sans-serif' }}>
+        <Sidebar />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: '#94A3B8' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>⏳</div>
+            <div>Chargement...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const kpis     = data?.kpis || {}
+  const evolution = data?.evolution || []
+  const topCaisses = data?.top_caisses || []
 
   return (
-    <div style={{ display:'flex', minHeight:'100vh', background:'#F8FAFC',
-      fontFamily:'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F1F5F9', fontFamily: 'Inter, Arial, sans-serif' }}>
       <Sidebar />
+      <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
 
-      <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
-
-        {/* Header */}
-        <div style={{ background:'#fff', padding:'14px 28px',
-          borderBottom:'1px solid #E2E8F0', display:'flex',
-          justifyContent:'space-between', alignItems:'center' }}>
-          <div>
-            <h2 style={{ margin:0, color:'#1B3A6B', fontWeight:'700', fontSize:'18px' }}>
-              Tableau de bord — Comptable
-            </h2>
-            <p style={{ margin:0, color:'#64748B', fontSize:'12px' }}>
-              {user.prenom} {user.nom} — Caisse principale active
-            </p>
-          </div>
-          <button style={{ background:'#1B3A6B', color:'#fff', border:'none',
-            borderRadius:'8px', padding:'10px 20px', fontSize:'13px',
-            fontWeight:'600', cursor:'pointer' }}>
-            + Nouveau paiement
-          </button>
+        <div style={{ marginBottom: '28px' }}>
+          <h1 style={{ margin: 0, fontSize: '26px', fontWeight: '800', color: '#1B3A6B' }}>
+            📊 Tableau de Bord — Comptable
+          </h1>
+          <p style={{ margin: '4px 0 0', color: '#64748B', fontSize: '14px' }}>
+            Vue d'ensemble de l'activité financière
+          </p>
         </div>
 
-        <div style={{ padding:'24px 28px' }}>
+        {/* KPIs */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '28px', flexWrap: 'wrap' }}>
+          {[
+            { icon: '💰', label: 'Total encaissé', value: `${fmt(kpis.total_encaisse)} FCFA`, bg: '#F0FDF4', color: '#16A34A' },
+            { icon: '💸', label: 'Total dépensé',  value: `${fmt(kpis.total_depense)} FCFA`,  bg: '#FEF2F2', color: '#DC2626' },
+            { icon: '🎓', label: 'Étudiants actifs', value: kpis.nb_etudiants_actifs,         bg: '#F5F3FF', color: '#7C3AED' },
+          ].map((k, i) => (
+            <div key={i} style={{ background: k.bg, borderRadius: '14px', padding: '22px 24px',
+              flex: 1, minWidth: '180px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div style={{ fontSize: '28px', marginBottom: '6px' }}>{k.icon}</div>
+              <div style={{ fontSize: '20px', fontWeight: '800', color: k.color }}>{k.value}</div>
+              <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>{k.label}</div>
+            </div>
+          ))}
+        </div>
 
-          {/* KPI */}
-          <div style={{ display:'flex', gap:'16px', marginBottom:'24px' }}>
-            <KpiCard title="Paiements aujourd'hui" value="8"
-              change="2 000 000 FCFA encaissés" changeType="up" color="green"/>
-            <KpiCard title="Solde caisse active" value="4 250 000 FCFA"
-              change="Caisse principale" changeType="up" color="blue"/>
-            <KpiCard title="Dépenses du jour" value="3"
-              change="123 000 FCFA" changeType="down" color="red"/>
-          </div>
+        {/* Graphique évolution */}
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '24px',
+          marginBottom: '20px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <h3 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: '700', color: '#1B3A6B' }}>
+            📈 Évolution des recettes — 6 derniers mois
+          </h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={evolution} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+              <XAxis dataKey="mois" tick={{ fontSize: 12, fill: '#64748B' }} />
+              <YAxis tick={{ fontSize: 11, fill: '#64748B' }}
+                tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+              <Tooltip formatter={(v) => [`${v.toLocaleString('fr-FR')} FCFA`, 'Recettes']}
+                contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '13px' }} />
+              <Bar dataKey="recettes" fill="#27AE60" radius={[4,4,0,0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
 
-          {/* Liste paiements */}
-          <div style={{ background:'#fff', borderRadius:'10px',
-            border:'1px solid #E2E8F0', padding:'20px' }}>
-            <h3 style={{ margin:'0 0 16px', color:'#1B3A6B', fontSize:'14px', fontWeight:'600' }}>
-              Paiements enregistrés aujourd'hui
-            </h3>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px' }}>
-              <thead>
-                <tr style={{ background:'#F8FAFC' }}>
-                  {['Heure','Étudiant','Montant','Mode','Statut'].map(h => (
-                    <th key={h} style={{ padding:'10px 14px', textAlign:'left',
-                      color:'#64748B', fontWeight:'600', fontSize:'11px',
-                      textTransform:'uppercase', borderBottom:'1px solid #E2E8F0' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paiements.map((p, i) => (
-                  <tr key={i} style={{ borderBottom:'1px solid #F1F5F9' }}>
-                    <td style={{ padding:'12px 14px', color:'#64748B' }}>{p.heure}</td>
-                    <td style={{ padding:'12px 14px', fontWeight:'500' }}>{p.etudiant}</td>
-                    <td style={{ padding:'12px 14px', fontWeight:'700', color:'#10B981' }}>
-                      {p.montant} FCFA
-                    </td>
-                    <td style={{ padding:'12px 14px', color:'#64748B' }}>{p.mode}</td>
-                    <td style={{ padding:'12px 14px' }}>
-                      <span style={{ background:'#D1FAE5', color:'#065F46',
-                        borderRadius:'20px', padding:'4px 12px',
-                        fontSize:'11px', fontWeight:'600' }}>✓ {p.statut}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* État caisses */}
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '24px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#1B3A6B' }}>
+            🏦 Soldes des caisses
+          </h3>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {topCaisses.map((c, i) => (
+              <div key={i} style={{ background: '#F8FAFC', borderRadius: '10px',
+                padding: '14px 18px', flex: 1, minWidth: '160px',
+                borderLeft: `4px solid #1B3A6B` }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px' }}>
+                  {c.nom}
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: '800',
+                  color: c.solde > 0 ? '#16A34A' : '#DC2626' }}>
+                  {c.solde.toLocaleString('fr-FR')} FCFA
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

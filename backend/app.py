@@ -12,9 +12,11 @@ from routes.utilisateurs import utilisateurs_bp
 from routes.etudiants import etudiants_bp
 from routes.caisses import caisses_bp
 from routes.paiements import paiements_bp
-# ── Sprint 4 ──
 from routes.depenses import depenses_bp
 from routes.budgets import budgets_bp
+# ── Sprint 5 ──
+from routes.dashboard import dashboard_bp
+from routes.rapports import rapports_bp
 
 
 def create_app():
@@ -37,24 +39,22 @@ def create_app():
     bcrypt.init_app(app)
     jwt.init_app(app)
 
-    # Sprint 1
     app.register_blueprint(auth_bp,         url_prefix='/api/auth')
     app.register_blueprint(utilisateurs_bp, url_prefix='/api/utilisateurs')
-    # Sprint 2
     app.register_blueprint(etudiants_bp,    url_prefix='/api/etudiants')
     app.register_blueprint(caisses_bp,      url_prefix='/api/caisses')
-    # Sprint 3
     app.register_blueprint(paiements_bp,    url_prefix='/api/paiements')
-    # Sprint 4
     app.register_blueprint(depenses_bp,     url_prefix='/api/depenses')
     app.register_blueprint(budgets_bp,      url_prefix='/api/budgets')
+    # Sprint 5
+    app.register_blueprint(dashboard_bp,    url_prefix='/api/dashboard')
+    app.register_blueprint(rapports_bp,     url_prefix='/api/rapports')
 
     return app
 
 
 if __name__ == '__main__':
     app = create_app()
-
     with app.app_context():
         db.create_all()
         print("✅ Tables créées / vérifiées")
@@ -75,7 +75,7 @@ if __name__ == '__main__':
             db.session.commit()
             print("✅ Comptes créés")
 
-        from models import Etudiant, Caisse
+        from models import Etudiant, Caisse, Budget
         if db.session.query(Etudiant).count() == 0:
             etudiants = [
                 Etudiant(matricule='ISM2026001', nom='Diallo', prenom='Mamadou',
@@ -101,28 +101,26 @@ if __name__ == '__main__':
         if db.session.query(Caisse).count() == 0:
             caisses = [
                 Caisse(nom='Caisse Principale', type_caisse='principale',
-                       description='Caisse principale de l\'école', solde_actuel=5000000.00),
+                       description='Caisse principale', solde_actuel=5000000.00),
                 Caisse(nom='Caisse Scolarité', type_caisse='secondaire',
-                       description='Paiements des frais de scolarité', solde_actuel=2500000.00),
+                       description='Frais scolarité', solde_actuel=2500000.00),
                 Caisse(nom='Caisse Projets', type_caisse='projet',
-                       description='Financement des projets étudiants', solde_actuel=750000.00),
+                       description='Projets étudiants', solde_actuel=750000.00),
             ]
             db.session.add_all(caisses)
             db.session.commit()
             print("✅ Caisses créées")
 
-        # Données de test Sprint 4 — Budgets
-        from models import Budget
         if db.session.query(Budget).count() == 0:
             budgets = [
-                Budget(categorie='Fournitures', montant_alloue=500000, annee='2026'),
-                Budget(categorie='Salaires',    montant_alloue=2000000, annee='2026'),
-                Budget(categorie='Maintenance', montant_alloue=300000, annee='2026'),
-                Budget(categorie='Evenements',  montant_alloue=400000, annee='2026'),
-                Budget(categorie='Informatique',montant_alloue=800000, annee='2026'),
+                Budget(categorie='Fournitures',  montant_alloue=500000,  annee='2026'),
+                Budget(categorie='Salaires',     montant_alloue=2000000, annee='2026'),
+                Budget(categorie='Maintenance',  montant_alloue=300000,  annee='2026'),
+                Budget(categorie='Evenements',   montant_alloue=400000,  annee='2026'),
+                Budget(categorie='Informatique', montant_alloue=800000,  annee='2026'),
             ]
             db.session.add_all(budgets)
             db.session.commit()
-            print("✅ Budgets de test créés")
+            print("✅ Budgets créés")
 
     app.run(debug=True, port=5000)
