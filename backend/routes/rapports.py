@@ -27,11 +27,14 @@ def raf_required(fn):
     return wrapper
 
 
-def _get_data_rapport(type_rapport, periode):
-    """Collecte les données selon le type et la période."""
+def _get_data_rapport(type_rapport, periode, id_caisse=None, date_debut=None, date_fin=None):
     now = datetime.utcnow()
 
-    if type_rapport == 'mensuel':
+    if type_rapport == 'personnalise' and date_debut and date_fin:
+        debut = datetime.strptime(date_debut, '%Y-%m-%d')
+        fin   = datetime.strptime(date_fin,   '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+        periode = f"{debut.strftime('%d/%m/%Y')} → {fin.strftime('%d/%m/%Y')}"
+    elif type_rapport == 'mensuel':
         try:
             mois, annee = int(periode.split('-')[1]), int(periode.split('-')[0])
         except Exception:
@@ -51,16 +54,27 @@ def _get_data_rapport(type_rapport, periode):
         debut = datetime(annee, 1, 1)
         fin   = datetime(annee + 1, 1, 1)
 
-    paiements = db.session.query(Paiement).filter(
+    q_paiements = db.session.query(Paiement).filter(
         Paiement.date_paiement >= debut,
         Paiement.date_paiement < fin
-    ).all()
-
-    depenses = db.session.query(Depense).filter(
+    )
+    q_depenses = db.session.query(Depense).filter(
         Depense.date_depense >= debut,
         Depense.date_depense < fin,
         Depense.statut == 'validee'
-    ).all()
+    )
+
+    if id_caisse:
+        q_paiements = q_paiements.filter(Paiement.id_caisse == id_caisse)
+        q_depenses  = q_depenses.filter(Depense.id_caisse == id_caisse)
+
+    paiements = q_paiements.all()
+    depenses  = q_depenses.all()
+
+    nom_caisse = None
+    if id_caisse:
+        c = db.session.get(Caisse, id_caisse)
+        nom_caisse = c.nom if c else None
 
     total_recettes = sum(float(p.montant) for p in paiements)
     total_depenses = sum(float(d.montant) for d in depenses)
@@ -70,6 +84,8 @@ def _get_data_rapport(type_rapport, periode):
         'type':           type_rapport,
         'debut':          debut.strftime('%d/%m/%Y'),
         'fin':            fin.strftime('%d/%m/%Y'),
+        'id_caisse':      id_caisse,
+        'nom_caisse':     nom_caisse or 'Toutes les caisses',
         'nb_paiements':   len(paiements),
         'total_recettes': total_recettes,
         'total_depenses': total_depenses,
@@ -87,20 +103,28 @@ def generer():
     type_rapport = data.get('type', 'mensuel')
     periode      = data.get('periode', datetime.utcnow().strftime('%Y-%m'))
     format_exp   = data.get('format', 'pdf')
+    id_caisse    = data.get('id_caisse') or None
+    date_debut   = data.get('date_debut') or None
+    date_fin     = data.get('date_fin')   or None
+    if id_caisse:
+        id_caisse = int(id_caisse)
 
-    if type_rapport not in ('mensuel', 'trimestriel', 'annuel'):
-        return jsonify({'message': 'Type invalide : mensuel | trimestriel | annuel'}), 400
+    if type_rapport not in ('mensuel', 'trimestriel', 'annuel', 'personnalise'):
+        return jsonify({'message': 'Type invalide'}), 400
     if format_exp not in ('pdf', 'excel'):
         return jsonify({'message': 'Format invalide : pdf | excel'}), 400
+    if type_rapport == 'personnalise' and not (date_debut and date_fin):
+        return jsonify({'message': 'Date de début et de fin obligatoires pour un rapport personnalisé'}), 400
 
     import json
-    donnees = _get_data_rapport(type_rapport, periode)
+    donnees = _get_data_rapport(type_rapport, periode, id_caisse, date_debut, date_fin)
 
     rapport = Rapport(
         type=type_rapport,
         periode=periode,
         contenu=json.dumps(donnees),
-        format=format_exp
+        format=format_exp,
+        id_caisse=id_caisse
     )
     db.session.add(rapport)
     db.session.commit()
@@ -194,7 +218,7 @@ def _export_pdf(rapport, donnees):
         ))
         elements.append(Spacer(1, 0.3*cm))
         elements.append(Paragraph(
-            f'Du {donnees["debut"]} au {donnees["fin"]}  |  Généré le {rapport.date_creation.strftime("%d/%m/%Y à %H:%M")}',
+            f'Du {donnees["debut"]} au {donnees["fin"]}  |  Caisse : {donnees["nom_caisse"]}  |  Généré le {rapport.date_creation.strftime("%d/%m/%Y à %H:%M")}',
             ParagraphStyle('dt', fontSize=10, textColor=GRAY, alignment=TA_CENTER)
         ))
         elements.append(Spacer(1, 0.5*cm))
@@ -295,7 +319,7 @@ def _export_excel(rapport, donnees):
         ws.row_dimensions[1].height = 35
 
         ws.merge_cells('A2:E2')
-        ws['A2'] = f'Période : {donnees["debut"]} → {donnees["fin"]}'
+        ws['A2'] = f'Période : {donnees["debut"]} → {donnees["fin"]}  |  Caisse : {donnees["nom_caisse"]}'
         ws['A2'].alignment = Alignment(horizontal='center')
         ws['A2'].font = Font(color='64748B', size=11)
 

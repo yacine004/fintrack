@@ -14,9 +14,12 @@ from routes.caisses import caisses_bp
 from routes.paiements import paiements_bp
 from routes.depenses import depenses_bp
 from routes.budgets import budgets_bp
-# ── Sprint 5 ──
 from routes.dashboard import dashboard_bp
 from routes.rapports import rapports_bp
+# ── Sprint 6 ──
+from routes.messages import messages_bp
+from routes.notifications import notifications_bp
+from routes.audit import audit_bp
 
 
 def create_app():
@@ -39,16 +42,19 @@ def create_app():
     bcrypt.init_app(app)
     jwt.init_app(app)
 
-    app.register_blueprint(auth_bp,         url_prefix='/api/auth')
-    app.register_blueprint(utilisateurs_bp, url_prefix='/api/utilisateurs')
-    app.register_blueprint(etudiants_bp,    url_prefix='/api/etudiants')
-    app.register_blueprint(caisses_bp,      url_prefix='/api/caisses')
-    app.register_blueprint(paiements_bp,    url_prefix='/api/paiements')
-    app.register_blueprint(depenses_bp,     url_prefix='/api/depenses')
-    app.register_blueprint(budgets_bp,      url_prefix='/api/budgets')
-    # Sprint 5
-    app.register_blueprint(dashboard_bp,    url_prefix='/api/dashboard')
-    app.register_blueprint(rapports_bp,     url_prefix='/api/rapports')
+    app.register_blueprint(auth_bp,            url_prefix='/api/auth')
+    app.register_blueprint(utilisateurs_bp,    url_prefix='/api/utilisateurs')
+    app.register_blueprint(etudiants_bp,       url_prefix='/api/etudiants')
+    app.register_blueprint(caisses_bp,         url_prefix='/api/caisses')
+    app.register_blueprint(paiements_bp,       url_prefix='/api/paiements')
+    app.register_blueprint(depenses_bp,        url_prefix='/api/depenses')
+    app.register_blueprint(budgets_bp,         url_prefix='/api/budgets')
+    app.register_blueprint(dashboard_bp,       url_prefix='/api/dashboard')
+    app.register_blueprint(rapports_bp,        url_prefix='/api/rapports')
+    # Sprint 6
+    app.register_blueprint(messages_bp,        url_prefix='/api/messages')
+    app.register_blueprint(notifications_bp,   url_prefix='/api/notifications')
+    app.register_blueprint(audit_bp,           url_prefix='/api/audit')
 
     return app
 
