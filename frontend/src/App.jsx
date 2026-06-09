@@ -2,10 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 // Sprint 1
 import Login              from './pages/Login'
-import RafDashboard       from './pages/raf/Dashboard'
 import RafUtilisateurs    from './pages/raf/Utilisateurs'
 import RafProfil          from './pages/raf/Profil'
-import ComptableDashboard from './pages/comptable/Dashboard'
 import ComptableProfil    from './pages/comptable/Profil'
 
 // Sprint 2
@@ -22,6 +20,11 @@ import ComptablePaiements from './pages/comptable/Paiements'
 import RafDepenses        from './pages/raf/Depenses'
 import RafBudgets         from './pages/raf/Budgets'
 import ComptableDepenses  from './pages/comptable/Depenses'
+
+// Sprint 5 — Dashboard mis à jour + Rapports
+import RafDashboard       from './pages/raf/Dashboard'
+import RafRapports        from './pages/raf/Rapports'
+import ComptableDashboard from './pages/comptable/Dashboard'
 
 function PrivateRoute({ children, role }) {
   const user  = JSON.parse(localStorage.getItem('user') || 'null')
@@ -47,6 +50,7 @@ export default function App() {
         <Route path="/raf/impayes"      element={<PrivateRoute role="raf"><RafImpayes /></PrivateRoute>} />
         <Route path="/raf/depenses"     element={<PrivateRoute role="raf"><RafDepenses /></PrivateRoute>} />
         <Route path="/raf/budgets"      element={<PrivateRoute role="raf"><RafBudgets /></PrivateRoute>} />
+        <Route path="/raf/rapports"     element={<PrivateRoute role="raf"><RafRapports /></PrivateRoute>} />
 
         {/* ── COMPTABLE ── */}
         <Route path="/comptable/dashboard"  element={<PrivateRoute role="comptable"><ComptableDashboard /></PrivateRoute>} />

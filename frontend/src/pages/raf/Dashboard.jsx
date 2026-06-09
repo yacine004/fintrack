@@ -1,168 +1,219 @@
+import { useState, useEffect } from 'react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+         PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import Sidebar from '../../components/Sidebar'
-import KpiCard from '../../components/KpiCard'
-import { BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 
-const barData = [
-  { mois:'Déc', paiements:1100000, depenses:380000 },
-  { mois:'Jan', paiements:1250000, depenses:420000 },
-  { mois:'Fév', paiements:980000,  depenses:310000 },
-  { mois:'Mar', paiements:1400000, depenses:500000 },
-  { mois:'Avr', paiements:1180000, depenses:390000 },
-  { mois:'Mai', paiements:1320000, depenses:380000 },
-]
+const API = 'http://localhost:5000/api'
+const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${localStorage.getItem('token')}`
+})
 
-const pieData = [
-  { name:'Personnel', value:40 },
-  { name:'Matériel', value:26 },
-  { name:'Entretien', value:16 },
-  { name:'Autre', value:18 },
-]
-const PIE_COLORS = ['#1B3A6B','#2D8CFF','#10B981','#F59E0B']
+const COLORS_PIE = ['#1B3A6B', '#27AE60', '#E67E22', '#8E44AD', '#E74C3C', '#2E75B6']
 
-const operations = [
-  { date:'13/05/2026', etudiant:'Diallo Amadou', type:'Paiement scolarité', montant:'+250 000', statut:'Validé', color:'#D1FAE5', textColor:'#065F46' },
-  { date:'13/05/2026', etudiant:'Ba Fatou', type:'Dépense entretien', montant:'-45 000', statut:'Dépassement', color:'#FEE2E2', textColor:'#991B1B' },
-  { date:'12/05/2026', etudiant:'Koné Ibrahima', type:'Paiement partiel', montant:'+125 000', statut:'Partiel', color:'#FEF3C7', textColor:'#92400E' },
-  { date:'12/05/2026', etudiant:'Sow Mariama', type:'Paiement scolarité', montant:'+250 000', statut:'Validé', color:'#D1FAE5', textColor:'#065F46' },
-  { date:'11/05/2026', etudiant:'Ndiaye Omar', type:'Dépense matériel', montant:'-78 000', statut:'Validé', color:'#D1FAE5', textColor:'#065F46' },
-]
+function KpiCard({ label, value, sub, bg, color, icon }) {
+  return (
+    <div style={{ background: bg, borderRadius: '14px', padding: '22px 24px',
+      flex: 1, minWidth: '160px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+      <div style={{ fontSize: '28px', marginBottom: '6px' }}>{icon}</div>
+      <div style={{ fontSize: '22px', fontWeight: '800', color }}>{value}</div>
+      <div style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>{label}</div>
+      {sub && <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px' }}>{sub}</div>}
+    </div>
+  )
+}
 
 export default function RafDashboard() {
-  const user = JSON.parse(localStorage.getItem('user') || '{}')
+  const [data, setData]       = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [filtreCaisse, setFiltreCaisse] = useState('')
+  const [caisses, setCaisses] = useState([])
+
+  const fetchDashboard = async () => {
+    setLoading(true)
+    try {
+      const params = filtreCaisse ? `?caisse_id=${filtreCaisse}` : ''
+      const res    = await fetch(`${API}/dashboard${params}`, { headers: getHeaders() })
+      const json   = await res.json()
+      if (res.ok) setData(json)
+    } catch {}
+    finally { setLoading(false) }
+  }
+
+  const fetchCaisses = async () => {
+    try {
+      const res  = await fetch(`${API}/caisses`, { headers: getHeaders() })
+      const json = await res.json()
+      if (res.ok) setCaisses(json.caisses)
+    } catch {}
+  }
+
+  useEffect(() => { fetchDashboard(); fetchCaisses() }, [filtreCaisse])
+
+  const fmt = (n) => Number(n || 0).toLocaleString('fr-FR')
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#F1F5F9', fontFamily: 'Inter, Arial, sans-serif' }}>
+        <Sidebar />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center', color: '#94A3B8' }}>
+            <div style={{ fontSize: '40px', marginBottom: '12px' }}>⏳</div>
+            <div>Chargement du tableau de bord...</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const kpis      = data?.kpis || {}
+  const evolution = data?.evolution || []
+  const modes     = data?.repartition_modes || []
+  const alertes   = data?.alertes_budget || []
+  const topCaisses = data?.top_caisses || []
 
   return (
-    <div style={{ display:'flex', minHeight:'100vh', background:'#F8FAFC',
-      fontFamily:'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F1F5F9', fontFamily: 'Inter, Arial, sans-serif' }}>
       <Sidebar />
+      <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
 
-      <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
-
-        {/* Header */}
-        <div style={{ background:'#fff', padding:'14px 28px',
-          borderBottom:'1px solid #E2E8F0', display:'flex',
-          justifyContent:'space-between', alignItems:'center' }}>
+        {/* En-tête */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
           <div>
-            <h2 style={{ margin:0, color:'#1B3A6B', fontWeight:'700', fontSize:'18px' }}>
-              Tableau de bord
-            </h2>
-            <p style={{ margin:0, color:'#64748B', fontSize:'12px' }}>
-              Bienvenue, {user.prenom} {user.nom} — Mercredi 13 mai 2026
+            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: '800', color: '#1B3A6B' }}>
+              📊 Tableau de Bord — RAF
+            </h1>
+            <p style={{ margin: '4px 0 0', color: '#64748B', fontSize: '14px' }}>
+              Vue d'ensemble financière en temps réel
             </p>
           </div>
-          <div style={{ display:'flex', alignItems:'center', gap:'12px' }}>
-            <div style={{ position:'relative' }}>
-              <div style={{ background:'#F1F5F9', borderRadius:'8px',
-                padding:'8px 12px', fontSize:'20px', cursor:'pointer' }}>🔔</div>
-              <div style={{ position:'absolute', top:'-4px', right:'-4px',
-                background:'#EF4444', borderRadius:'50%', width:'16px',
-                height:'16px', display:'flex', alignItems:'center',
-                justifyContent:'center', color:'#fff', fontSize:'10px',
-                fontWeight:'700' }}>3</div>
-            </div>
+          <select value={filtreCaisse} onChange={e => setFiltreCaisse(e.target.value)}
+            style={{ padding: '9px 14px', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+              fontSize: '14px', outline: 'none', background: '#fff' }}>
+            <option value="">Toutes les caisses</option>
+            {caisses.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        </div>
+
+        {/* Alertes budget */}
+        {alertes.length > 0 && (
+          <div style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {alertes.map((a, i) => (
+              <div key={i} style={{
+                background: a.type === 'depasse' ? '#FEF2F2' : '#FFF7ED',
+                border: `1px solid ${a.type === 'depasse' ? '#FCA5A5' : '#FCD34D'}`,
+                borderRadius: '10px', padding: '12px 16px',
+                display: 'flex', alignItems: 'center', gap: '10px'
+              }}>
+                <span style={{ fontSize: '20px' }}>{a.type === 'depasse' ? '🚨' : '⚠️'}</span>
+                <span style={{ fontSize: '14px', fontWeight: '600',
+                  color: a.type === 'depasse' ? '#DC2626' : '#D97706' }}>
+                  Budget "{a.categorie}" — {a.taux}% consommé
+                  {a.type === 'depasse' ? ' — DÉPASSÉ !' : ' — Attention'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* KPIs */}
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '28px', flexWrap: 'wrap' }}>
+          <KpiCard icon="💰" label="Total encaissé" value={`${fmt(kpis.total_encaisse)} FCFA`}
+            bg="#F0FDF4" color="#16A34A" />
+          <KpiCard icon="💸" label="Total dépensé" value={`${fmt(kpis.total_depense)} FCFA`}
+            bg="#FEF2F2" color="#DC2626" />
+          <KpiCard icon="🏦" label="Solde global" value={`${fmt(kpis.solde_global)} FCFA`}
+            bg="#EFF6FF" color="#1B3A6B" />
+          <KpiCard icon="🎓" label="Étudiants actifs" value={kpis.nb_etudiants_actifs}
+            bg="#F5F3FF" color="#7C3AED" />
+          <KpiCard icon="⚠️" label="Impayés" value={kpis.nb_impayes}
+            bg="#FFF7ED" color="#EA580C"
+            sub={kpis.nb_impayes > 0 ? 'Voir la liste' : 'Aucun impayé'} />
+        </div>
+
+        {/* Graphiques */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginBottom: '24px' }}>
+
+          {/* Histogramme évolution 6 mois */}
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '24px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <h3 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: '700', color: '#1B3A6B' }}>
+              📈 Évolution Recettes / Dépenses — 6 derniers mois
+            </h3>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={evolution} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                <XAxis dataKey="mois" tick={{ fontSize: 12, fill: '#64748B' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748B' }}
+                  tickFormatter={v => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                <Tooltip formatter={(v, n) => [`${v.toLocaleString('fr-FR')} FCFA`, n === 'recettes' ? 'Recettes' : 'Dépenses']}
+                  contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '13px' }} />
+                <Legend formatter={v => v === 'recettes' ? 'Recettes' : 'Dépenses'} />
+                <Bar dataKey="recettes" fill="#27AE60" radius={[4,4,0,0]} />
+                <Bar dataKey="depenses" fill="#E74C3C" radius={[4,4,0,0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Camembert modes de paiement */}
+          <div style={{ background: '#fff', borderRadius: '14px', padding: '24px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <h3 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: '700', color: '#1B3A6B' }}>
+              🥧 Modes de paiement
+            </h3>
+            {modes.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie data={modes} dataKey="nb" nameKey="mode" cx="50%" cy="50%"
+                      outerRadius={75} label={({ mode, percent }) => `${mode} ${(percent*100).toFixed(0)}%`}
+                      labelLine={false} fontSize={11}>
+                      {modes.map((_, i) => <Cell key={i} fill={COLORS_PIE[i % COLORS_PIE.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v, n) => [v, 'Nombre']}
+                      contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                  {modes.map((m, i) => (
+                    <span key={i} style={{ background: '#F8FAFC', borderRadius: '20px',
+                      padding: '3px 10px', fontSize: '11px', color: COLORS_PIE[i % COLORS_PIE.length],
+                      fontWeight: '600', border: `1px solid ${COLORS_PIE[i % COLORS_PIE.length]}` }}>
+                      {m.mode} ({m.nb})
+                    </span>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: '#94A3B8', fontSize: '13px' }}>
+                Aucun paiement enregistré
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Contenu */}
-        <div style={{ padding:'24px 28px', flex:1 }}>
-
-          {/* KPI */}
-          <div style={{ display:'flex', gap:'16px', marginBottom:'24px' }}>
-            <KpiCard title="Solde global" value="4 250 000 FCFA"
-              change="+12% vs mois dernier" changeType="up" color="blue"/>
-            <KpiCard title="Paiements du mois" value="1 320 000 FCFA"
-              change="48 paiements" changeType="up" color="green"/>
-            <KpiCard title="Dépenses du mois" value="380 000 FCFA"
-              change="5 dépassements" changeType="down" color="red"/>
-            <KpiCard title="Impayés" value="12 étudiants"
-              change="À relancer" changeType="warn" color="orange"/>
-          </div>
-
-          {/* Graphiques */}
-          <div style={{ display:'flex', gap:'16px', marginBottom:'24px' }}>
-
-            <div style={{ flex:2, background:'#fff', borderRadius:'10px',
-              border:'1px solid #E2E8F0', padding:'20px' }}>
-              <h3 style={{ margin:'0 0 16px', color:'#1B3A6B', fontSize:'14px',
-                fontWeight:'600' }}>Paiements vs Dépenses (6 mois)</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={barData}>
-                  <XAxis dataKey="mois" tick={{ fontSize:11 }}/>
-                  <YAxis tick={{ fontSize:10 }}
-                    tickFormatter={v => `${(v/1000).toFixed(0)}K`}/>
-                  <Tooltip formatter={v => `${v.toLocaleString()} FCFA`}/>
-                  <Bar dataKey="paiements" fill="#1B3A6B" radius={[4,4,0,0]} name="Paiements"/>
-                  <Bar dataKey="depenses" fill="#2D8CFF" radius={[4,4,0,0]} name="Dépenses"/>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div style={{ flex:1, background:'#fff', borderRadius:'10px',
-              border:'1px solid #E2E8F0', padding:'20px' }}>
-              <h3 style={{ margin:'0 0 16px', color:'#1B3A6B', fontSize:'14px',
-                fontWeight:'600' }}>Répartition des dépenses</h3>
-              <ResponsiveContainer width="100%" height={200}>
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={55}
-                    outerRadius={80} dataKey="value">
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i]}/>
-                    ))}
-                  </Pie>
-                  <Legend iconSize={10} wrapperStyle={{ fontSize:'11px' }}/>
-                  <Tooltip formatter={v => `${v}%`}/>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* Tableau opérations */}
-          <div style={{ background:'#fff', borderRadius:'10px',
-            border:'1px solid #E2E8F0', padding:'20px' }}>
-            <div style={{ display:'flex', justifyContent:'space-between',
-              alignItems:'center', marginBottom:'16px' }}>
-              <h3 style={{ margin:0, color:'#1B3A6B', fontSize:'14px', fontWeight:'600' }}>
-                Dernières opérations
-              </h3>
-              <button style={{ background:'#1B3A6B', color:'#fff', border:'none',
-                borderRadius:'6px', padding:'8px 16px', fontSize:'12px',
-                fontWeight:'600', cursor:'pointer' }}>
-                Voir tout →
-              </button>
-            </div>
-            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:'13px' }}>
-              <thead>
-                <tr style={{ background:'#F8FAFC' }}>
-                  {['Date','Étudiant','Type','Montant','Statut'].map(h => (
-                    <th key={h} style={{ padding:'10px 14px', textAlign:'left',
-                      color:'#64748B', fontWeight:'600', fontSize:'11px',
-                      textTransform:'uppercase', letterSpacing:'0.5px',
-                      borderBottom:'1px solid #E2E8F0' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {operations.map((op, i) => (
-                  <tr key={i} style={{ borderBottom:'1px solid #F1F5F9',
-                    background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
-                    <td style={{ padding:'12px 14px', color:'#64748B' }}>{op.date}</td>
-                    <td style={{ padding:'12px 14px', fontWeight:'500', color:'#1E293B' }}>
-                      {op.etudiant}
-                    </td>
-                    <td style={{ padding:'12px 14px', color:'#64748B' }}>{op.type}</td>
-                    <td style={{ padding:'12px 14px', fontWeight:'700',
-                      color: op.montant.startsWith('+') ? '#10B981' : '#EF4444' }}>
-                      {op.montant} FCFA
-                    </td>
-                    <td style={{ padding:'12px 14px' }}>
-                      <span style={{ background:op.color, color:op.textColor,
-                        borderRadius:'20px', padding:'4px 12px', fontSize:'11px',
-                        fontWeight:'600' }}>{op.statut}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Top caisses */}
+        <div style={{ background: '#fff', borderRadius: '14px', padding: '24px',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#1B3A6B' }}>
+            🏦 État des Caisses
+          </h3>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {topCaisses.map((c, i) => (
+              <div key={i} style={{ background: '#F8FAFC', borderRadius: '10px',
+                padding: '14px 18px', flex: 1, minWidth: '160px',
+                borderLeft: `4px solid ${COLORS_PIE[i % COLORS_PIE.length]}` }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px' }}>
+                  {c.nom}
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: '800',
+                  color: c.solde > 0 ? '#16A34A' : '#DC2626' }}>
+                  {c.solde.toLocaleString('fr-FR')} FCFA
+                </div>
+                <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '2px',
+                  textTransform: 'capitalize' }}>{c.type}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
