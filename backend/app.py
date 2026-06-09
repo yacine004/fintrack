@@ -11,8 +11,10 @@ from routes.auth import auth_bp
 from routes.utilisateurs import utilisateurs_bp
 from routes.etudiants import etudiants_bp
 from routes.caisses import caisses_bp
-# ── Sprint 3 ──
 from routes.paiements import paiements_bp
+# ── Sprint 4 ──
+from routes.depenses import depenses_bp
+from routes.budgets import budgets_bp
 
 
 def create_app():
@@ -43,6 +45,9 @@ def create_app():
     app.register_blueprint(caisses_bp,      url_prefix='/api/caisses')
     # Sprint 3
     app.register_blueprint(paiements_bp,    url_prefix='/api/paiements')
+    # Sprint 4
+    app.register_blueprint(depenses_bp,     url_prefix='/api/depenses')
+    app.register_blueprint(budgets_bp,      url_prefix='/api/budgets')
 
     return app
 
@@ -105,5 +110,19 @@ if __name__ == '__main__':
             db.session.add_all(caisses)
             db.session.commit()
             print("✅ Caisses créées")
+
+        # Données de test Sprint 4 — Budgets
+        from models import Budget
+        if db.session.query(Budget).count() == 0:
+            budgets = [
+                Budget(categorie='Fournitures', montant_alloue=500000, annee='2026'),
+                Budget(categorie='Salaires',    montant_alloue=2000000, annee='2026'),
+                Budget(categorie='Maintenance', montant_alloue=300000, annee='2026'),
+                Budget(categorie='Evenements',  montant_alloue=400000, annee='2026'),
+                Budget(categorie='Informatique',montant_alloue=800000, annee='2026'),
+            ]
+            db.session.add_all(budgets)
+            db.session.commit()
+            print("✅ Budgets de test créés")
 
     app.run(debug=True, port=5000)

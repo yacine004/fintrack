@@ -215,7 +215,7 @@ export default function RafPaiements() {
         setNbPages(data.nb_pages)
         setKpis(data.kpis)
       }
-    } catch {}
+    } catch { /* network error */ }
     finally { setLoading(false) }
   }, [page, filtreMode, filtreCaisse, dateDebut, dateFin])
 
@@ -228,10 +228,12 @@ export default function RafPaiements() {
       const [dataE, dataC] = await Promise.all([resE.json(), resC.json()])
       if (resE.ok) setEtudiants(dataE.etudiants)
       if (resC.ok) setCaisses(dataC.caisses)
-    } catch {}
+    } catch { /* network error */ }
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchPaiements() }, [fetchPaiements])
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchSelectData() }, [])
 
   const handleRecu = (id) => window.open(`${API}/paiements/${id}/recu`, '_blank')

@@ -18,6 +18,11 @@ import RafPaiements       from './pages/raf/Paiements'
 import RafImpayes         from './pages/raf/Impayes'
 import ComptablePaiements from './pages/comptable/Paiements'
 
+// Sprint 4
+import RafDepenses        from './pages/raf/Depenses'
+import RafBudgets         from './pages/raf/Budgets'
+import ComptableDepenses  from './pages/comptable/Depenses'
+
 function PrivateRoute({ children, role }) {
   const user  = JSON.parse(localStorage.getItem('user') || 'null')
   const token = localStorage.getItem('token')
@@ -40,12 +45,15 @@ export default function App() {
         <Route path="/raf/caisses"      element={<PrivateRoute role="raf"><RafCaisses /></PrivateRoute>} />
         <Route path="/raf/paiements"    element={<PrivateRoute role="raf"><RafPaiements /></PrivateRoute>} />
         <Route path="/raf/impayes"      element={<PrivateRoute role="raf"><RafImpayes /></PrivateRoute>} />
+        <Route path="/raf/depenses"     element={<PrivateRoute role="raf"><RafDepenses /></PrivateRoute>} />
+        <Route path="/raf/budgets"      element={<PrivateRoute role="raf"><RafBudgets /></PrivateRoute>} />
 
         {/* ── COMPTABLE ── */}
         <Route path="/comptable/dashboard"  element={<PrivateRoute role="comptable"><ComptableDashboard /></PrivateRoute>} />
         <Route path="/comptable/profil"     element={<PrivateRoute role="comptable"><ComptableProfil /></PrivateRoute>} />
         <Route path="/comptable/etudiants"  element={<PrivateRoute role="comptable"><ComptableEtudiants /></PrivateRoute>} />
         <Route path="/comptable/paiements"  element={<PrivateRoute role="comptable"><ComptablePaiements /></PrivateRoute>} />
+        <Route path="/comptable/depenses"   element={<PrivateRoute role="comptable"><ComptableDepenses /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
   )
