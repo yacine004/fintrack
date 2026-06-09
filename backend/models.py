@@ -13,8 +13,16 @@ class Utilisateur(db.Model):
     role              = db.Column(db.String(50), nullable=False)
     actif             = db.Column(db.Boolean, default=True)
     date_creation     = db.Column(db.DateTime, default=datetime.utcnow)
+
     notifications     = db.relationship('Notification', backref='utilisateur', lazy=True,
                                          foreign_keys='Notification.id_utilisateur')
+    messages_envoyes  = db.relationship('Message', backref='expediteur', lazy=True,
+                                         foreign_keys='Message.id_expediteur')
+    messages_recus    = db.relationship('Message', backref='destinataire', lazy=True,
+                                         foreign_keys='Message.id_destinataire')
+    audit_logs        = db.relationship('AuditLog', backref='utilisateur_audit', lazy=True,
+                                         foreign_keys='AuditLog.id_utilisateur')
+
     def to_dict(self):
         return {'id': self.id_utilisateur, 'nom': self.nom, 'prenom': self.prenom,
                 'email': self.email, 'contact': self.contact or '',
@@ -133,9 +141,6 @@ class Notification(db.Model):
                 'date_creation': self.date_creation.strftime('%d/%m/%Y %H:%M')}
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# SPRINT 5 — Rapport
-# ══════════════════════════════════════════════════════════════════════════════
 class Rapport(db.Model):
     __tablename__ = 'rapport'
     id_rapport    = db.Column(db.Integer, primary_key=True)
@@ -144,12 +149,62 @@ class Rapport(db.Model):
     contenu       = db.Column(db.Text, nullable=True)
     format        = db.Column(db.String(20), default='pdf')
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+    def to_dict(self):
+        return {'id': self.id_rapport, 'type': self.type,
+                'periode': self.periode, 'format': self.format,
+                'date_creation': self.date_creation.strftime('%d/%m/%Y %H:%M')}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINT 6 — Message
+# ══════════════════════════════════════════════════════════════════════════════
+class Message(db.Model):
+    __tablename__ = 'message'
+    id_message       = db.Column(db.Integer, primary_key=True)
+    id_expediteur    = db.Column(db.Integer, db.ForeignKey('utilisateur.id_utilisateur'), nullable=False)
+    id_destinataire  = db.Column(db.Integer, db.ForeignKey('utilisateur.id_utilisateur'), nullable=False)
+    objet            = db.Column(db.String(200), nullable=False)
+    contenu          = db.Column(db.Text, nullable=False)
+    lu               = db.Column(db.Boolean, default=False)
+    date_envoi       = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        exp  = db.session.get(Utilisateur, self.id_expediteur)
+        dest = db.session.get(Utilisateur, self.id_destinataire)
+        return {
+            'id':               self.id_message,
+            'id_expediteur':    self.id_expediteur,
+            'expediteur':       f"{exp.prenom} {exp.nom}" if exp else 'Inconnu',
+            'expediteur_role':  exp.role if exp else '',
+            'id_destinataire':  self.id_destinataire,
+            'destinataire':     f"{dest.prenom} {dest.nom}" if dest else 'Inconnu',
+            'objet':            self.objet,
+            'contenu':          self.contenu,
+            'lu':               self.lu,
+            'date_envoi':       self.date_envoi.strftime('%d/%m/%Y %H:%M')
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINT 6 — AuditLog
+# ══════════════════════════════════════════════════════════════════════════════
+class AuditLog(db.Model):
+    __tablename__ = 'audit_log'
+    id_audit       = db.Column(db.Integer, primary_key=True)
+    id_utilisateur = db.Column(db.Integer, db.ForeignKey('utilisateur.id_utilisateur'), nullable=False)
+    action         = db.Column(db.String(100), nullable=False)
+    entite         = db.Column(db.String(100), nullable=False)
+    id_entite      = db.Column(db.Integer, nullable=True)
+    details        = db.Column(db.Text, nullable=True)
+    date_action    = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
         return {
-            'id':           self.id_rapport,
-            'type':         self.type,
-            'periode':      self.periode,
-            'format':       self.format,
-            'date_creation': self.date_creation.strftime('%d/%m/%Y %H:%M')
+            'id':             self.id_audit,
+            'id_utilisateur': self.id_utilisateur,
+            'action':         self.action,
+            'entite':         self.entite,
+            'id_entite':      self.id_entite,
+            'details':        self.details,
+            'date_action':    self.date_action.strftime('%d/%m/%Y %H:%M')
         }
