@@ -7,7 +7,7 @@ const menuRAF = [
   { icon: '🎓', label: 'Étudiants',        path: '/raf/etudiants' },
   { icon: '💳', label: 'Paiements',        path: '/raf/paiements' },
   { icon: '💰', label: 'Dépenses',         path: '/raf/depenses' },
-  { icon: '📋', label: 'Budget',           path: '/raf/budget' },
+  { icon: '📋', label: 'Budget',           path: '/raf/budgets' },
   { icon: '📈', label: 'Rapports',         path: '/raf/rapports' },
   { icon: '💬', label: 'Messagerie',       path: '/raf/messagerie' },
 ]
