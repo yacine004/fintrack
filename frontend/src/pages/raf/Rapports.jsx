@@ -8,9 +8,10 @@ const getHeaders = () => ({
 })
 
 const TYPE_INFO = {
-  mensuel:      { label: '📅 Mensuel',      desc: 'Récapitulatif d\'un mois' },
-  trimestriel:  { label: '📆 Trimestriel',  desc: 'Récapitulatif d\'un trimestre' },
-  annuel:       { label: '🗓️ Annuel',        desc: 'Récapitulatif d\'une année' },
+  mensuel:      { label: '📅 Mensuel',       desc: 'Récapitulatif d\'un mois' },
+  trimestriel:  { label: '📆 Trimestriel',   desc: 'Récapitulatif d\'un trimestre' },
+  annuel:       { label: '🗓️ Annuel',         desc: 'Récapitulatif d\'une année' },
+  personnalise: { label: '🎯 Personnalisé',  desc: 'Choisissez librement la période de début et de fin' },
 }
 
 export default function RafRapports() {
@@ -22,10 +23,14 @@ export default function RafRapports() {
   const [total, setTotal]           = useState(0)
 
   // Formulaire
-  const [type, setType]       = useState('mensuel')
-  const [periode, setPeriode] = useState(new Date().toISOString().slice(0, 7))
-  const [format, setFormat]   = useState('pdf')
-  const [erreur, setErreur]   = useState('')
+  const [type, setType]           = useState('mensuel')
+  const [periode, setPeriode]     = useState(new Date().toISOString().slice(0, 7))
+  const [dateDebut, setDateDebut] = useState('')
+  const [dateFin, setDateFin]     = useState('')
+  const [format, setFormat]       = useState('pdf')
+  const [idCaisse, setIdCaisse]   = useState('')
+  const [caisses, setCaisses]     = useState([])
+  const [erreur, setErreur]       = useState('')
 
   const now = new Date()
 
@@ -53,14 +58,27 @@ export default function RafRapports() {
 
   useEffect(() => { fetchRapports() }, [fetchRapports])
 
+  useEffect(() => {
+    fetch(`${API}/caisses`, { headers: getHeaders() })
+      .then(r => r.json())
+      .then(data => setCaisses(Array.isArray(data) ? data : (data.caisses || [])))
+      .catch(() => {})
+  }, [])
+
   const handleGenerer = async () => {
-    if (!periode) { setErreur('La période est obligatoire'); return }
+    if (type === 'personnalise' && (!dateDebut || !dateFin)) { setErreur('Veuillez renseigner la date de début et de fin'); return }
+    if (type !== 'personnalise' && !periode) { setErreur('La période est obligatoire'); return }
     setGenerating(true)
     setErreur('')
     try {
       const res  = await fetch(`${API}/rapports`, {
         method: 'POST', headers: getHeaders(),
-        body: JSON.stringify({ type, periode, format })
+        body: JSON.stringify({
+          type, periode, format,
+          id_caisse:   idCaisse  || null,
+          date_debut:  type === 'personnalise' ? dateDebut : null,
+          date_fin:    type === 'personnalise' ? dateFin   : null,
+        })
       })
       const data = await res.json()
       if (!res.ok) { setErreur(data.message); return }
@@ -69,8 +87,22 @@ export default function RafRapports() {
     finally { setGenerating(false) }
   }
 
-  const handleExporter = (id, fmt) => {
-    window.open(`${API}/rapports/${id}/export?format=${fmt}`, '_blank')
+  const handleExporter = async (id, fmt) => {
+    try {
+      const res = await fetch(`${API}/rapports/${id}/export?format=${fmt}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })
+      if (!res.ok) { setErreur("Erreur lors de l'export du rapport"); return }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href     = url
+      a.download = `rapport_${id}.${fmt === 'pdf' ? 'pdf' : 'xlsx'}`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch { setErreur('Erreur de connexion') }
   }
 
   return (
@@ -99,7 +131,7 @@ export default function RafRapports() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '16px', alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: type === 'personnalise' ? '1fr 1fr 1fr 1fr 1fr auto' : '1fr 1fr 1fr 1fr auto', gap: '16px', alignItems: 'end' }}>
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B',
                 marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Type *</label>
@@ -111,16 +143,36 @@ export default function RafRapports() {
                 ))}
               </select>
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B',
-                marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                {getPeriodeLabel()} *
-              </label>
-              <input value={periode} onChange={e => setPeriode(e.target.value)}
-                placeholder={getPeriodePlaceholder()}
-                style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E2E8F0',
-                  borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
-            </div>
+            {type === 'personnalise' ? (
+              <>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B',
+                    marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date début *</label>
+                  <input type='date' value={dateDebut} onChange={e => setDateDebut(e.target.value)}
+                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E2E8F0',
+                      borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B',
+                    marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Date fin *</label>
+                  <input type='date' value={dateFin} onChange={e => setDateFin(e.target.value)}
+                    min={dateDebut}
+                    style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E2E8F0',
+                      borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+                </div>
+              </>
+            ) : (
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B',
+                  marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {getPeriodeLabel()} *
+                </label>
+                <input value={periode} onChange={e => setPeriode(e.target.value)}
+                  placeholder={getPeriodePlaceholder()}
+                  style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E2E8F0',
+                    borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+              </div>
+            )}
             <div>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B',
                 marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Format *</label>
@@ -129,6 +181,18 @@ export default function RafRapports() {
                   borderRadius: '8px', fontSize: '14px', outline: 'none' }}>
                 <option value="pdf">📄 PDF</option>
                 <option value="excel">📊 Excel</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B',
+                marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Caisse</label>
+              <select value={idCaisse} onChange={e => setIdCaisse(e.target.value)}
+                style={{ width: '100%', padding: '10px 14px', border: '1.5px solid #E2E8F0',
+                  borderRadius: '8px', fontSize: '14px', outline: 'none' }}>
+                <option value=''>Toutes les caisses</option>
+                {caisses.map(c => (
+                  <option key={c.id} value={c.id}>{c.nom}</option>
+                ))}
               </select>
             </div>
             <button onClick={handleGenerer} disabled={generating}
@@ -171,7 +235,7 @@ export default function RafRapports() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#F8FAFC' }}>
-                  {['Type', 'Période', 'Format', 'Date génération', 'Actions'].map(h => (
+                  {['Type', 'Période', 'Caisse', 'Format', 'Date génération', 'Actions'].map(h => (
                     <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px',
                       fontWeight: '700', color: '#64748B', textTransform: 'uppercase',
                       letterSpacing: '0.5px', borderBottom: '1px solid #E2E8F0' }}>{h}</th>
@@ -190,6 +254,9 @@ export default function RafRapports() {
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#1E293B' }}>
                       {r.periode}
+                    </td>
+                    <td style={{ padding: '12px 16px', fontSize: '12px', color: '#475569' }}>
+                      {r.nom_caisse || 'Toutes'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ background: r.format === 'pdf' ? '#FEF2F2' : '#F0FDF4',
