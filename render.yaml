@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: fintrack-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: DATABASE_URL
+        value: postgresql://fintrack_user:TaHgPXCBt9iXcYFX3mtg5By201KGlHX4@dpg-d8gvhqldt1ts73fpbgh0-a.frankfurt-postgres.render.com/fintrack_db_c93g
+      - key: JWT_SECRET_KEY
+        value: fintrack-secret-2026

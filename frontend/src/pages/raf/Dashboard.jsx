@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
          PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import Sidebar from '../../components/Sidebar'
 
-const API = 'http://localhost:5000/api'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const getHeaders = () => ({
   'Content-Type': 'application/json',
   Authorization: `Bearer ${localStorage.getItem('token')}`
