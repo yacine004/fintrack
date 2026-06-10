@@ -40,12 +40,28 @@ export default function Sidebar() {
   // Close drawer on navigation
   useEffect(() => { setOpen(false) }, [location.pathname])
 
-  // Add paddingTop to parent flex container on mobile so content clears the top bar
+  // Add paddingTop to parent flex container on mobile so content clears the top bar.
+  // box-sizing: border-box ensures the 56px is absorbed inside min-height (not added on top).
+  // min-height: 100dvh uses dynamic viewport height (excludes browser chrome on iOS Safari).
   useEffect(() => {
     const parent = ref.current?.parentElement
     if (!parent) return
-    parent.style.paddingTop = isMobile ? '56px' : ''
-    return () => { if (parent) parent.style.paddingTop = '' }
+    if (isMobile) {
+      parent.style.paddingTop = '56px'
+      parent.style.boxSizing = 'border-box'
+      parent.style.minHeight = '100dvh'
+    } else {
+      parent.style.paddingTop = ''
+      parent.style.boxSizing = ''
+      parent.style.minHeight = ''
+    }
+    return () => {
+      if (parent) {
+        parent.style.paddingTop = ''
+        parent.style.boxSizing = ''
+        parent.style.minHeight = ''
+      }
+    }
   }, [isMobile])
 
   // Lock body scroll when drawer is open
@@ -152,7 +168,7 @@ export default function Sidebar() {
 
         {/* Drawer */}
         <div style={{
-          position: 'fixed', top: 0, left: 0, height: '100vh', width: '260px',
+          position: 'fixed', top: 0, left: 0, bottom: 0, width: '260px',
           background: '#1B3A6B', zIndex: 299, display: 'flex', flexDirection: 'column',
           transform: open ? 'translateX(0)' : 'translateX(-100%)',
           transition: 'transform 0.25s ease', overflowY: 'auto',
@@ -188,7 +204,7 @@ export default function Sidebar() {
   // ── DESKTOP ─────────────────────────────────────────────
   return (
     <div style={{
-      width: '210px', minHeight: '100vh', background: '#1B3A6B',
+      width: '210px', minHeight: '100dvh', background: '#1B3A6B',
       display: 'flex', flexDirection: 'column', flexShrink: 0,
     }}>
       {/* Logo */}

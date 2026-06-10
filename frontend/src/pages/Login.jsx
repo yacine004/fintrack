@@ -42,7 +42,7 @@ export default function Login() {
     <div style={{
       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: '#fff', padding: isMobile ? '32px 24px' : '48px 40px',
-      minHeight: isMobile ? '100vh' : 'auto',
+      minHeight: isMobile ? '100dvh' : 'auto',
     }}>
       <div style={{ width: '100%', maxWidth: '420px' }}>
 
@@ -142,7 +142,7 @@ export default function Login() {
 
   // Desktop: two-column layout
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', height: '100dvh', fontFamily: 'Inter, sans-serif' }}>
 
       {/* Left panel */}
       <div style={{
