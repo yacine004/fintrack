@@ -63,7 +63,7 @@ function ModalPaiement({ etudiants, caisses, onClose, onSave }) {
           <div style={{ fontSize: '60px', marginBottom: '16px' }}>✅</div>
           <h2 style={{ color: '#16A34A', fontSize: '20px', margin: '0 0 16px' }}>Paiement enregistré !</h2>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button onClick={() => window.open(`${API}/paiements/${success.paiement.id}/recu`, '_blank')}
+            <button onClick={() => handleRecu(success.paiement.id)}
               style={{ padding: '10px 18px', background: '#1B3A6B', color: '#fff',
                 border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
               🖨️ Reçu PDF
@@ -192,6 +192,20 @@ export default function ComptablePaiements() {
   useEffect(() => { fetchPaiements() }, [fetchPaiements])
   useEffect(() => { fetchSelectData() }, [])
 
+  const handleRecu = async (id) => {
+    try {
+      const res = await fetch(`${API}/paiements/${id}/recu`, { headers: getHeaders() })
+      if (!res.ok) { alert('Erreur génération du reçu'); return }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url; a.target = '_blank'
+      a.download = `recu_FT${String(id).padStart(5,'0')}.pdf`
+      document.body.appendChild(a); a.click()
+      document.body.removeChild(a); URL.revokeObjectURL(url)
+    } catch { alert('Erreur de connexion') }
+  }
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#F1F5F9', fontFamily: 'Inter, Arial, sans-serif' }}>
       <Sidebar />
@@ -269,7 +283,7 @@ export default function ComptablePaiements() {
                       <td style={{ padding: '12px 16px', fontSize: '13px', color: '#64748B' }}>{p.motif || '—'}</td>
                       <td style={{ padding: '12px 16px', fontSize: '12px', color: '#94A3B8' }}>{p.date_paiement}</td>
                       <td style={{ padding: '12px 16px' }}>
-                        <button onClick={() => window.open(`${API}/paiements/${p.id}/recu`, '_blank')}
+                        <button onClick={() => handleRecu(p.id)}
                           style={{ padding: '5px 10px', background: '#EFF6FF', color: '#2563EB',
                             border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
                           🖨️

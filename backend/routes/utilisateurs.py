@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
 from extensions import db, bcrypt
 from models import Utilisateur
+from routes.audit import log_action
 
 utilisateurs_bp = Blueprint('utilisateurs', __name__)
 
@@ -84,6 +85,9 @@ def creer():
     )
     db.session.add(user)
     db.session.commit()
+    identity = get_jwt().get('user', {})
+    log_action(identity.get('id'), 'CREATE', 'Utilisateur', user.id_utilisateur, {'nom': f"{prenom} {nom}", 'role': role, 'email': email})
+    db.session.commit()
     return jsonify({'message': 'Utilisateur créé avec succès', 'utilisateur': user.to_dict()}), 201
 
 # ── MODIFIER ──────────────────────────────────────────────────────────────────
@@ -105,6 +109,9 @@ def modifier(uid):
         user.role = data['role']
 
     db.session.commit()
+    identity = get_jwt().get('user', {})
+    log_action(identity.get('id'), 'UPDATE', 'Utilisateur', uid, {'nom': f"{user.prenom} {user.nom}", 'role': user.role})
+    db.session.commit()
     return jsonify({'message': 'Utilisateur modifié', 'utilisateur': user.to_dict()}), 200
 
 # ── ACTIVER / DÉSACTIVER ──────────────────────────────────────────────────────
@@ -120,6 +127,9 @@ def toggle(uid):
         return jsonify({'message': 'Utilisateur introuvable'}), 404
 
     user.actif = not user.actif
+    db.session.commit()
+    log_action(identity.get('id'), 'ACTIVER' if user.actif else 'DESACTIVER', 'Utilisateur', uid,
+               {'nom': f"{user.prenom} {user.nom}", 'role': user.role})
     db.session.commit()
     return jsonify({
         'message': f"Compte {'activé' if user.actif else 'désactivé'}",
@@ -155,6 +165,10 @@ def supprimer(uid):
     if not user:
         return jsonify({'message': 'Utilisateur introuvable'}), 404
 
+    nom_complet = f"{user.prenom} {user.nom}"
+    role_user   = user.role
     db.session.delete(user)
+    db.session.commit()
+    log_action(identity.get('id'), 'DELETE', 'Utilisateur', uid, {'nom': nom_complet, 'role': role_user})
     db.session.commit()
     return jsonify({'message': 'Utilisateur supprimé avec succès'}), 200

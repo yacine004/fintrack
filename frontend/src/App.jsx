@@ -2,10 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 // Sprint 1
 import Login              from './pages/Login'
-import RafDashboard       from './pages/raf/Dashboard'
 import RafUtilisateurs    from './pages/raf/Utilisateurs'
 import RafProfil          from './pages/raf/Profil'
-import ComptableDashboard from './pages/comptable/Dashboard'
 import ComptableProfil    from './pages/comptable/Profil'
 
 // Sprint 2
@@ -22,6 +20,18 @@ import ComptablePaiements from './pages/comptable/Paiements'
 import RafDepenses        from './pages/raf/Depenses'
 import RafBudgets         from './pages/raf/Budgets'
 import ComptableDepenses  from './pages/comptable/Depenses'
+
+// Sprint 5
+import RafDashboard       from './pages/raf/Dashboard'
+import RafRapports        from './pages/raf/Rapports'
+import ComptableDashboard from './pages/comptable/Dashboard'
+
+// Sprint 6
+import RafMessagerie         from './pages/raf/Messagerie'
+import RafAuditLog           from './pages/raf/AuditLog'
+import RafNotifications      from './pages/raf/Notifications'
+import ComptableMessagerie   from './pages/comptable/Messagerie'
+import ComptableNotifications from './pages/raf/Notifications'
 
 function PrivateRoute({ children, role }) {
   const user  = JSON.parse(localStorage.getItem('user') || 'null')
@@ -47,13 +57,19 @@ export default function App() {
         <Route path="/raf/impayes"      element={<PrivateRoute role="raf"><RafImpayes /></PrivateRoute>} />
         <Route path="/raf/depenses"     element={<PrivateRoute role="raf"><RafDepenses /></PrivateRoute>} />
         <Route path="/raf/budgets"      element={<PrivateRoute role="raf"><RafBudgets /></PrivateRoute>} />
+        <Route path="/raf/rapports"     element={<PrivateRoute role="raf"><RafRapports /></PrivateRoute>} />
+        <Route path="/raf/messagerie"   element={<PrivateRoute role="raf"><RafMessagerie /></PrivateRoute>} />
+        <Route path="/raf/audit"          element={<PrivateRoute role="raf"><RafAuditLog /></PrivateRoute>} />
+        <Route path="/raf/notifications"  element={<PrivateRoute role="raf"><RafNotifications /></PrivateRoute>} />
 
         {/* ── COMPTABLE ── */}
-        <Route path="/comptable/dashboard"  element={<PrivateRoute role="comptable"><ComptableDashboard /></PrivateRoute>} />
-        <Route path="/comptable/profil"     element={<PrivateRoute role="comptable"><ComptableProfil /></PrivateRoute>} />
-        <Route path="/comptable/etudiants"  element={<PrivateRoute role="comptable"><ComptableEtudiants /></PrivateRoute>} />
-        <Route path="/comptable/paiements"  element={<PrivateRoute role="comptable"><ComptablePaiements /></PrivateRoute>} />
-        <Route path="/comptable/depenses"   element={<PrivateRoute role="comptable"><ComptableDepenses /></PrivateRoute>} />
+        <Route path="/comptable/dashboard"   element={<PrivateRoute role="comptable"><ComptableDashboard /></PrivateRoute>} />
+        <Route path="/comptable/profil"      element={<PrivateRoute role="comptable"><ComptableProfil /></PrivateRoute>} />
+        <Route path="/comptable/etudiants"   element={<PrivateRoute role="comptable"><ComptableEtudiants /></PrivateRoute>} />
+        <Route path="/comptable/paiements"   element={<PrivateRoute role="comptable"><ComptablePaiements /></PrivateRoute>} />
+        <Route path="/comptable/depenses"    element={<PrivateRoute role="comptable"><ComptableDepenses /></PrivateRoute>} />
+        <Route path="/comptable/messagerie"     element={<PrivateRoute role="comptable"><ComptableMessagerie /></PrivateRoute>} />
+        <Route path="/comptable/notifications" element={<PrivateRoute role="comptable"><ComptableNotifications /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
   )

@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from app import create_app
 from extensions import db, bcrypt
-from models import Etudiant, Caisse, Paiement, Utilisateur
+from models import Etudiant, Caisse, Paiement, Utilisateur, Depense, Budget, Notification
 from datetime import datetime, timedelta
 import random
 
@@ -137,12 +137,130 @@ def seed():
         else:
             print('[INFO] Paiements deja presents')
 
+        # ── Budgets 2026 ──────────────────────────────────────────────────────
+        BUDGETS = [
+            ('Fournitures',   500_000),
+            ('Entretien',     800_000),
+            ('Personnel',   2_000_000),
+            ('Evenements',    600_000),
+            ('Informatique', 1_200_000),
+            ('Transport',     300_000),
+        ]
+        if Budget.query.count() == 0:
+            for categorie, alloue in BUDGETS:
+                db.session.add(Budget(
+                    categorie=categorie,
+                    montant_alloue=alloue,
+                    montant_consomme=0.0,
+                    annee='2026'
+                ))
+            db.session.commit()
+            print(f'[OK] {len(BUDGETS)} budgets ajoutes')
+        else:
+            print('[INFO] Budgets deja presents')
+
+        # ── Dépenses de démonstration ─────────────────────────────────────────
+        DEPENSES_DATA = [
+            # (montant, motif, categorie, statut, jours_avant_auj)
+            ( 85_000, 'Achat rames de papier et stylos',          'Fournitures',   'validee',    120),
+            ( 45_000, 'Cartouches imprimante bureau',             'Fournitures',   'validee',     95),
+            ( 30_000, 'Agrafes, classeurs et fournitures bureau', 'Fournitures',   'en_attente',  10),
+            (180_000, 'Réparation climatiseur salle de cours',    'Entretien',     'validee',    110),
+            ( 95_000, 'Remplacement vitres bâtiment B',           'Entretien',     'validee',     80),
+            ( 60_000, 'Entretien groupe électrogène',             'Entretien',     'en_attente',   5),
+            ( 40_000, 'Réparation fuite toiture',                 'Entretien',     'rejetee',     70),
+            (350_000, 'Vacations enseignants module Finance',      'Personnel',     'validee',    100),
+            (420_000, 'Heures supplémentaires personnel admin',   'Personnel',     'validee',     60),
+            (280_000, 'Rémunération intervenants Sprint 3',       'Personnel',     'en_attente',   3),
+            (150_000, 'Cérémonie remise de diplômes L3',          'Evenements',    'validee',     90),
+            (200_000, 'Journée portes ouvertes ISM',              'Evenements',    'en_attente',   7),
+            ( 90_000, 'Gala de fin d\'année étudiants',           'Evenements',    'rejetee',     85),
+            (320_000, 'Achat 5 ordinateurs salle informatique',   'Informatique',  'validee',    115),
+            (180_000, 'Licences logiciels comptabilité',          'Informatique',  'validee',     75),
+            ( 95_000, 'Switch réseau et câblage salle TP',        'Informatique',  'en_attente',   4),
+            ( 55_000, 'Transport matériel pédagogique Thiès',     'Transport',     'validee',    105),
+            ( 48_000, 'Déplacement délégation partenaires',       'Transport',     'en_attente',   2),
+            ( 35_000, 'Frais carburant véhicule école',           'Transport',     'rejetee',     50),
+        ]
+
+        if Depense.query.count() < 5:
+            caisses = Caisse.query.filter_by(statut='active').all()
+            budgets_map = {b.categorie: b for b in Budget.query.filter_by(annee='2026').all()}
+
+            if not caisses:
+                print('[WARN] Aucune caisse active — depenses ignorees')
+            else:
+                base = datetime(2026, 1, 1)
+                depenses = []
+                for i, (montant, motif, categorie, statut, jours) in enumerate(DEPENSES_DATA):
+                    caisse = caisses[i % len(caisses)]
+                    date_dep = base + timedelta(days=jours)
+
+                    depense = Depense(
+                        id_caisse=caisse.id_caisse,
+                        montant=montant,
+                        motif=motif,
+                        categorie=categorie,
+                        statut=statut,
+                        date_depense=date_dep,
+                    )
+                    depenses.append(depense)
+
+                    # Ajuster le solde caisse (validee et en_attente débitent, rejetee rembourse)
+                    if statut in ('validee', 'en_attente'):
+                        caisse.solde_actuel = float(caisse.solde_actuel) - montant
+
+                    # Mettre à jour montant_consomme du budget (seulement les validees)
+                    if statut == 'validee' and categorie in budgets_map:
+                        budgets_map[categorie].montant_consomme = (
+                            float(budgets_map[categorie].montant_consomme) + montant
+                        )
+
+                db.session.add_all(depenses)
+                db.session.commit()
+                print(f'[OK] {len(depenses)} depenses de demonstration ajoutees')
+        else:
+            print('[INFO] Depenses deja presentes')
+
+        # ── Notifications pour les RAF ─────────────────────────────────────────
+        if Notification.query.count() == 0:
+            rafs = Utilisateur.query.filter_by(role='raf', actif=True).all()
+            if not rafs:
+                print('[WARN] Aucun utilisateur RAF actif — notifications ignorees')
+            else:
+                NOTIFS = [
+                    ('alerte_budget', "Budget 'Informatique' a 83% — Attention"),
+                    ('alerte_budget', "Budget 'Personnel' a 53% — Consommation normale"),
+                    ('alerte_budget', "Budget 'Evenements' a 58% — Consommation normale"),
+                    ('info',          "3 depenses en attente de validation"),
+                    ('info',          "Rapport mensuel Mai 2026 disponible"),
+                ]
+                notifs = []
+                base_notif = datetime(2026, 5, 20)
+                for raf in rafs:
+                    for j, (type_n, msg) in enumerate(NOTIFS):
+                        notifs.append(Notification(
+                            id_utilisateur=raf.id_utilisateur,
+                            type=type_n,
+                            message=msg,
+                            lu=(j > 1),
+                            date_creation=base_notif + timedelta(days=j),
+                        ))
+                db.session.add_all(notifs)
+                db.session.commit()
+                print(f'[OK] {len(notifs)} notifications ajoutees')
+        else:
+            print('[INFO] Notifications deja presentes')
+
         # ── Résumé ────────────────────────────────────────────────────────────
         print('\n--- Etat de la base ---')
-        print(f'  Utilisateurs : {Utilisateur.query.count()}')
-        print(f'  Etudiants    : {Etudiant.query.count()}')
-        print(f'  Caisses      : {Caisse.query.count()}')
-        print(f'  Paiements    : {Paiement.query.count()}')
+        print(f'  Utilisateurs   : {Utilisateur.query.count()}')
+        print(f'  Etudiants      : {Etudiant.query.count()}')
+        print(f'  Caisses        : {Caisse.query.count()}')
+        print(f'  Paiements      : {Paiement.query.count()}')
+        print(f'  Budgets        : {Budget.query.count()}')
+        print(f'  Depenses       : {Depense.query.count()}')
+        print(f'  Notifications  : {Notification.query.count()}')
         for c in Caisse.query.all():
             print(f'  {c.nom} -> {float(c.solde_actuel):,.0f} FCFA')
 
