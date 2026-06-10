@@ -10,6 +10,8 @@ const menuRAF = [
   { icon: '📋', label: 'Budget',           path: '/raf/budgets' },
   { icon: '📈', label: 'Rapports',         path: '/raf/rapports' },
   { icon: '💬', label: 'Messagerie',       path: '/raf/messagerie' },
+  { icon: '🔍', label: 'Journal d\'audit',  path: '/raf/audit' },
+  { icon: '🔔', label: 'Notifications',    path: '/raf/notifications' },
 ]
 
 const menuComptable = [
@@ -17,7 +19,8 @@ const menuComptable = [
   { icon: '🎓', label: 'Étudiants',        path: '/comptable/etudiants' },
   { icon: '💳', label: 'Paiements',        path: '/comptable/paiements' },
   { icon: '💰', label: 'Dépenses',         path: '/comptable/depenses' },
-  { icon: '💬', label: 'Messagerie',       path: '/comptable/messagerie' },
+  { icon: '💬', label: 'Messagerie',    path: '/comptable/messagerie' },
+  { icon: '🔔', label: 'Notifications', path: '/comptable/notifications' },
 ]
 
 export default function Sidebar() {

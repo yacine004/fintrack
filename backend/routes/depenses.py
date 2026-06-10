@@ -4,6 +4,7 @@ from functools import wraps
 from extensions import db
 from models import Depense, Caisse, Budget, Notification, Utilisateur
 from datetime import datetime
+from routes.audit import log_action
 
 depenses_bp = Blueprint('depenses', __name__)
 
@@ -27,13 +28,13 @@ def auth_required(fn):
     return wrapper
 
 
-def creer_notification(id_utilisateur, type_notif, message):
-    """Créer une notification automatique."""
+def creer_notification(id_utilisateur, type_notif, message, priorite='normale'):
     try:
         notif = Notification(
             id_utilisateur=id_utilisateur,
             type=type_notif,
-            message=message
+            message=message,
+            priorite=priorite
         )
         db.session.add(notif)
     except Exception:
@@ -97,15 +98,22 @@ def creer():
 
                 if taux >= 100:
                     alerte_budget = f"🚨 Budget '{categorie}' DÉPASSÉ ({taux:.0f}%)"
+                    prio = 'critique'
                 elif taux >= 80:
                     alerte_budget = f"⚠️ Budget '{categorie}' à {taux:.0f}% — Attention"
+                    prio = 'haute'
+                else:
+                    prio = 'normale'
 
                 if alerte_budget:
-                    # Notifier tous les RAF
                     rafs = db.session.query(Utilisateur).filter_by(role='raf', actif=True).all()
                     for raf in rafs:
-                        creer_notification(raf.id_utilisateur, 'alerte_budget', alerte_budget)
+                        creer_notification(raf.id_utilisateur, 'alerte_budget', alerte_budget, prio)
 
+        db.session.commit()
+
+        log_action(identity.get('id'), 'CREATE', 'Depense', depense.id_depense,
+                   {'montant': montant, 'motif': motif, 'caisse': caisse.nom, 'categorie': categorie})
         db.session.commit()
 
         return jsonify({
@@ -197,6 +205,10 @@ def valider(did):
     depense.statut = 'validee'
     db.session.commit()
 
+    identity = get_jwt().get('user', {})
+    log_action(identity.get('id'), 'VALIDER', 'Depense', did, {'montant': float(depense.montant), 'motif': depense.motif})
+    db.session.commit()
+
     return jsonify({
         'message': 'Dépense validée avec succès',
         'depense': depense.to_dict()
@@ -219,6 +231,10 @@ def rejeter(did):
         caisse.solde_actuel = float(caisse.solde_actuel) + float(depense.montant)
 
     depense.statut = 'rejetee'
+    db.session.commit()
+
+    identity = get_jwt().get('user', {})
+    log_action(identity.get('id'), 'REJETER', 'Depense', did, {'montant': float(depense.montant), 'motif': depense.motif})
     db.session.commit()
 
     return jsonify({

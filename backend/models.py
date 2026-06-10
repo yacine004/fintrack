@@ -27,7 +27,7 @@ class Utilisateur(db.Model):
         return {'id': self.id_utilisateur, 'nom': self.nom, 'prenom': self.prenom,
                 'email': self.email, 'contact': self.contact or '',
                 'role': self.role, 'actif': self.actif,
-                'date_creation': self.date_creation.strftime('%d/%m/%Y')}
+                'date_creation': self.date_creation.strftime('%d/%m/%Y') if self.date_creation else ''}
 
 
 class Etudiant(db.Model):
@@ -72,7 +72,7 @@ class Caisse(db.Model):
                 'description': self.description or '',
                 'solde_actuel': float(self.solde_actuel),
                 'type_caisse': self.type_caisse, 'statut': self.statut,
-                'date_creation': self.date_creation.strftime('%d/%m/%Y')}
+                'date_creation': self.date_creation.strftime('%d/%m/%Y') if self.date_creation else ''}
 
 
 class Paiement(db.Model):
@@ -124,7 +124,7 @@ class Budget(db.Model):
                 'montant_alloue': float(self.montant_alloue),
                 'montant_consomme': float(self.montant_consomme),
                 'annee': self.annee,
-                'date_creation': self.date_creation.strftime('%d/%m/%Y')}
+                'date_creation': self.date_creation.strftime('%d/%m/%Y') if self.date_creation else ''}
 
 
 class Notification(db.Model):
@@ -134,10 +134,12 @@ class Notification(db.Model):
     type            = db.Column(db.String(50), nullable=False)
     message         = db.Column(db.String(300), nullable=False)
     lu              = db.Column(db.Boolean, default=False)
+    priorite        = db.Column(db.String(20), default='normale')
     date_creation   = db.Column(db.DateTime, default=datetime.utcnow)
     def to_dict(self):
         return {'id': self.id_notification, 'id_utilisateur': self.id_utilisateur,
                 'type': self.type, 'message': self.message, 'lu': self.lu,
+                'priorite': self.priorite or 'normale',
                 'date_creation': self.date_creation.strftime('%d/%m/%Y %H:%M')}
 
 
@@ -148,10 +150,12 @@ class Rapport(db.Model):
     periode       = db.Column(db.String(50), nullable=False)
     contenu       = db.Column(db.Text, nullable=True)
     format        = db.Column(db.String(20), default='pdf')
+    id_caisse     = db.Column(db.Integer, db.ForeignKey('caisse.id_caisse'), nullable=True)
     date_creation = db.Column(db.DateTime, default=datetime.utcnow)
     def to_dict(self):
         return {'id': self.id_rapport, 'type': self.type,
                 'periode': self.periode, 'format': self.format,
+                'id_caisse': self.id_caisse,
                 'date_creation': self.date_creation.strftime('%d/%m/%Y %H:%M')}
 
 

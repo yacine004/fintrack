@@ -97,7 +97,7 @@ def _get_data_rapport(type_rapport, periode, id_caisse=None, date_debut=None, da
 
 # ── GÉNÉRER un rapport ────────────────────────────────────────────────────────
 @rapports_bp.route('', methods=['POST'])
-@auth_required
+@raf_required
 def generer():
     data         = request.get_json()
     type_rapport = data.get('type', 'mensuel')

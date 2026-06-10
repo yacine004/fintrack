@@ -4,6 +4,7 @@ from functools import wraps
 from extensions import db
 from models import Paiement, Etudiant, Caisse
 from datetime import datetime
+from routes.audit import log_action
 import io
 
 paiements_bp = Blueprint('paiements', __name__)
@@ -82,6 +83,11 @@ def creer():
         # Mise à jour solde caisse
         caisse.solde_actuel = float(caisse.solde_actuel) + montant
 
+        db.session.commit()
+
+        identity = get_jwt().get('user', {})
+        log_action(identity.get('id'), 'CREATE', 'Paiement', paiement.id_paiement,
+                   {'montant': montant, 'etudiant_id': id_etudiant, 'caisse': caisse.nom, 'mode': mode_paiement})
         db.session.commit()
 
         return jsonify({

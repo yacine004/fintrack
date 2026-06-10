@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt
 from extensions import db, bcrypt
 from models import Utilisateur
+from routes.audit import log_action
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -11,6 +12,9 @@ def login():
     data     = request.get_json()
     email    = data.get('email', '').strip().lower()
     password = data.get('password', '')
+
+    if not email or not password:
+        return jsonify({'message': 'Email et mot de passe obligatoires'}), 400
 
     user = db.session.query(Utilisateur).filter_by(email=email).first()
 
@@ -32,6 +36,9 @@ def login():
             }
         }
     )
+    log_action(user.id_utilisateur, 'LOGIN', 'Utilisateur', user.id_utilisateur, {'role': user.role})
+    db.session.commit()
+
     return jsonify({'token': token, 'user': user.to_dict()}), 200
 
 # ── GET PROFIL ────────────────────────────────────────────────────────────────
@@ -74,9 +81,9 @@ def change_password():
         return jsonify({'message': 'Utilisateur introuvable'}), 404
 
     data        = request.get_json()
-    ancien      = data.get('ancien_mot_de_passe', '')
-    nouveau     = data.get('nouveau_mot_de_passe', '')
-    confirmation = data.get('confirmation', '')
+    ancien      = data.get('ancien_mot_de_passe') or data.get('ancien_password', '')
+    nouveau     = data.get('nouveau_mot_de_passe') or data.get('nouveau_password', '')
+    confirmation = data.get('confirmation') or data.get('nouveau_password', '')
 
     if not bcrypt.check_password_hash(user.mot_de_passe_hash, ancien):
         return jsonify({'message': 'Ancien mot de passe incorrect'}), 400

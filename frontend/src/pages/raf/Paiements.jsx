@@ -76,7 +76,7 @@ function ModalPaiement({ etudiants, caisses, onClose, onSave }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button onClick={() => window.open(`${API}/paiements/${success.paiement.id}/recu`, '_blank')}
+            <button onClick={() => handleRecu(success.paiement.id)}
               style={{ padding: '10px 20px', background: '#1B3A6B', color: '#fff',
                 border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
               🖨️ Voir le reçu PDF
@@ -236,7 +236,19 @@ export default function RafPaiements() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchSelectData() }, [])
 
-  const handleRecu = (id) => window.open(`${API}/paiements/${id}/recu`, '_blank')
+  const handleRecu = async (id) => {
+    try {
+      const res = await fetch(`${API}/paiements/${id}/recu`, { headers: getHeaders() })
+      if (!res.ok) { alert('Erreur génération du reçu'); return }
+      const blob = await res.blob()
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url; a.target = '_blank'
+      a.download = `recu_FT${String(id).padStart(5,'0')}.pdf`
+      document.body.appendChild(a); a.click()
+      document.body.removeChild(a); URL.revokeObjectURL(url)
+    } catch { alert('Erreur de connexion') }
+  }
 
   const cardStyle = (bg) => ({
     background: bg, borderRadius: '12px', padding: '20px 24px',
