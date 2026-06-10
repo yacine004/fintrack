@@ -1,4 +1,6 @@
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useIsMobile } from '../hooks/useIsMobile'
 
 const menuRAF = [
   { icon: '📊', label: 'Tableau de bord',  path: '/raf/dashboard' },
@@ -10,7 +12,7 @@ const menuRAF = [
   { icon: '📋', label: 'Budget',           path: '/raf/budgets' },
   { icon: '📈', label: 'Rapports',         path: '/raf/rapports' },
   { icon: '💬', label: 'Messagerie',       path: '/raf/messagerie' },
-  { icon: '🔍', label: 'Journal d\'audit',  path: '/raf/audit' },
+  { icon: '🔍', label: "Journal d'audit",  path: '/raf/audit' },
   { icon: '🔔', label: 'Notifications',    path: '/raf/notifications' },
 ]
 
@@ -19,90 +21,199 @@ const menuComptable = [
   { icon: '🎓', label: 'Étudiants',        path: '/comptable/etudiants' },
   { icon: '💳', label: 'Paiements',        path: '/comptable/paiements' },
   { icon: '💰', label: 'Dépenses',         path: '/comptable/depenses' },
-  { icon: '💬', label: 'Messagerie',    path: '/comptable/messagerie' },
-  { icon: '🔔', label: 'Notifications', path: '/comptable/notifications' },
+  { icon: '💬', label: 'Messagerie',       path: '/comptable/messagerie' },
+  { icon: '🔔', label: 'Notifications',    path: '/comptable/notifications' },
 ]
 
 export default function Sidebar() {
-  const navigate  = useNavigate()
-  const location  = useLocation()
-  const user      = JSON.parse(localStorage.getItem('user') || '{}')
-  const menu      = user.role === 'raf' ? menuRAF : menuComptable
+  const navigate   = useNavigate()
+  const location   = useLocation()
+  const user       = JSON.parse(localStorage.getItem('user') || '{}')
+  const menu       = user.role === 'raf' ? menuRAF : menuComptable
   const profilPath = user.role === 'raf' ? '/raf/profil' : '/comptable/profil'
+  const isMobile   = useIsMobile()
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
 
   const logout = () => { localStorage.clear(); navigate('/') }
 
-  return (
-    <div style={{ width:'210px', minHeight:'100vh', background:'#1B3A6B',
-      display:'flex', flexDirection:'column', flexShrink:0 }}>
+  // Close drawer on navigation
+  useEffect(() => { setOpen(false) }, [location.pathname])
 
-      {/* Logo */}
-      <div style={{ padding:'20px 16px 16px', borderBottom:'1px solid rgba(255,255,255,0.1)' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-          <div style={{ background:'#2D8CFF', borderRadius:'8px', width:'36px',
-            height:'36px', display:'flex', alignItems:'center',
-            justifyContent:'center', fontSize:'18px' }}>📈</div>
-          <div>
-            <div style={{ color:'#fff', fontWeight:'800', fontSize:'16px' }}>
-              Fin<span style={{ color:'#2D8CFF' }}>Track</span>
+  // Add paddingTop to parent flex container on mobile so content clears the top bar
+  useEffect(() => {
+    const parent = ref.current?.parentElement
+    if (!parent) return
+    parent.style.paddingTop = isMobile ? '56px' : ''
+    return () => { if (parent) parent.style.paddingTop = '' }
+  }, [isMobile])
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    document.body.style.overflow = (isMobile && open) ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [isMobile, open])
+
+  // Shared: menu item list
+  const menuItems = menu.map((item) => {
+    const isActive = location.pathname === item.path
+    return (
+      <div key={item.path} onClick={() => navigate(item.path)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '9px 12px', borderRadius: '8px', marginBottom: '2px',
+          cursor: 'pointer',
+          background: isActive ? 'rgba(45,140,255,0.2)' : 'transparent',
+          borderLeft: isActive ? '3px solid #2D8CFF' : '3px solid transparent',
+          color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
+          fontSize: '13px', fontWeight: isActive ? '600' : '400',
+        }}>
+        <span style={{ fontSize: '15px' }}>{item.icon}</span>
+        {item.label}
+      </div>
+    )
+  })
+
+  // Shared: profile + logout block
+  const profileBlock = (
+    <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+      <div onClick={() => navigate(profilPath)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: '10px',
+          marginBottom: '12px', cursor: 'pointer', padding: '6px 8px', borderRadius: '8px',
+        }}>
+        <div style={{
+          width: '36px', height: '36px', borderRadius: '50%',
+          background: '#2D8CFF', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: '#fff', fontWeight: '700',
+          fontSize: '12px', flexShrink: 0,
+        }}>
+          {user.prenom?.[0]}{user.nom?.[0]}
+        </div>
+        <div>
+          <div style={{ color: '#fff', fontSize: '12px', fontWeight: '600' }}>
+            {user.prenom} {user.nom}
+          </div>
+          <div style={{ color: '#93C5FD', fontSize: '10px', textTransform: 'capitalize' }}>
+            {user.role} · Mon profil
+          </div>
+        </div>
+      </div>
+      <button onClick={logout} style={{
+        width: '100%', padding: '8px',
+        background: 'rgba(239,68,68,0.15)', color: '#FCA5A5',
+        border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px',
+        fontSize: '12px', cursor: 'pointer', fontWeight: '600',
+      }}>
+        🚪 Déconnexion
+      </button>
+    </div>
+  )
+
+  // ── MOBILE ──────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div ref={ref} style={{ width: 0, flexShrink: 0 }}>
+        {/* Fixed top bar */}
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, height: '56px',
+          background: '#1B3A6B', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', padding: '0 16px',
+          zIndex: 300, boxShadow: '0 2px 8px rgba(0,0,0,0.25)',
+        }}>
+          <button onClick={() => setOpen(!open)} style={{
+            background: 'none', border: 'none', color: '#fff',
+            fontSize: '22px', cursor: 'pointer', padding: '4px 8px',
+            lineHeight: 1, display: 'flex', alignItems: 'center',
+          }}>
+            {open ? '✕' : '☰'}
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{
+              background: '#2D8CFF', borderRadius: '6px', width: '28px', height: '28px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px',
+            }}>📈</div>
+            <span style={{ color: '#fff', fontWeight: '800', fontSize: '16px' }}>
+              Fin<span style={{ color: '#2D8CFF' }}>Track</span>
+            </span>
+          </div>
+
+          {/* Notifications bell (right side) */}
+          <div style={{ width: '40px' }} />
+        </div>
+
+        {/* Overlay */}
+        {open && (
+          <div onClick={() => setOpen(false)} style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 298,
+          }} />
+        )}
+
+        {/* Drawer */}
+        <div style={{
+          position: 'fixed', top: 0, left: 0, height: '100vh', width: '260px',
+          background: '#1B3A6B', zIndex: 299, display: 'flex', flexDirection: 'column',
+          transform: open ? 'translateX(0)' : 'translateX(-100%)',
+          transition: 'transform 0.25s ease', overflowY: 'auto',
+        }}>
+          {/* Logo in drawer */}
+          <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                background: '#2D8CFF', borderRadius: '8px', width: '36px', height: '36px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
+              }}>📈</div>
+              <div>
+                <div style={{ color: '#fff', fontWeight: '800', fontSize: '16px' }}>
+                  Fin<span style={{ color: '#2D8CFF' }}>Track</span>
+                </div>
+                <div style={{ color: '#93C5FD', fontSize: '9px', letterSpacing: '1px' }}>
+                  GESTION FINANCIÈRE
+                </div>
+              </div>
             </div>
-            <div style={{ color:'#93C5FD', fontSize:'9px', letterSpacing:'1px' }}>
+          </div>
+
+          <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
+            {menuItems}
+          </nav>
+
+          {profileBlock}
+        </div>
+      </div>
+    )
+  }
+
+  // ── DESKTOP ─────────────────────────────────────────────
+  return (
+    <div style={{
+      width: '210px', minHeight: '100vh', background: '#1B3A6B',
+      display: 'flex', flexDirection: 'column', flexShrink: 0,
+    }}>
+      {/* Logo */}
+      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            background: '#2D8CFF', borderRadius: '8px', width: '36px', height: '36px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px',
+          }}>📈</div>
+          <div>
+            <div style={{ color: '#fff', fontWeight: '800', fontSize: '16px' }}>
+              Fin<span style={{ color: '#2D8CFF' }}>Track</span>
+            </div>
+            <div style={{ color: '#93C5FD', fontSize: '9px', letterSpacing: '1px' }}>
               GESTION FINANCIÈRE
             </div>
           </div>
         </div>
       </div>
 
-      {/* Menu */}
-      <nav style={{ flex:1, padding:'12px 8px', overflowY:'auto' }}>
-        {menu.map((item) => {
-          const isActive = location.pathname === item.path
-          return (
-            <div key={item.path} onClick={() => navigate(item.path)}
-              style={{ display:'flex', alignItems:'center', gap:'10px',
-                padding:'9px 12px', borderRadius:'8px', marginBottom:'2px',
-                cursor:'pointer',
-                background: isActive ? 'rgba(45,140,255,0.2)' : 'transparent',
-                borderLeft: isActive ? '3px solid #2D8CFF' : '3px solid transparent',
-                color: isActive ? '#fff' : 'rgba(255,255,255,0.65)',
-                fontSize:'13px', fontWeight: isActive ? '600' : '400' }}>
-              <span style={{ fontSize:'15px' }}>{item.icon}</span>
-              {item.label}
-            </div>
-          )
-        })}
+      <nav style={{ flex: 1, padding: '12px 8px', overflowY: 'auto' }}>
+        {menuItems}
       </nav>
 
-      {/* Profil + déconnexion */}
-      <div style={{ padding:'16px', borderTop:'1px solid rgba(255,255,255,0.1)' }}>
-        <div onClick={() => navigate(profilPath)}
-          style={{ display:'flex', alignItems:'center', gap:'10px',
-            marginBottom:'12px', cursor:'pointer', padding:'6px 8px',
-            borderRadius:'8px', transition:'background 0.15s' }}
-          onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.08)'}
-          onMouseLeave={e => e.currentTarget.style.background='transparent'}>
-          <div style={{ width:'36px', height:'36px', borderRadius:'50%',
-            background:'#2D8CFF', display:'flex', alignItems:'center',
-            justifyContent:'center', color:'#fff', fontWeight:'700',
-            fontSize:'12px', flexShrink:0 }}>
-            {user.prenom?.[0]}{user.nom?.[0]}
-          </div>
-          <div>
-            <div style={{ color:'#fff', fontSize:'12px', fontWeight:'600' }}>
-              {user.prenom} {user.nom}
-            </div>
-            <div style={{ color:'#93C5FD', fontSize:'10px', textTransform:'capitalize' }}>
-              {user.role} · Mon profil
-            </div>
-          </div>
-        </div>
-        <button onClick={logout}
-          style={{ width:'100%', padding:'8px', background:'rgba(239,68,68,0.15)',
-            color:'#FCA5A5', border:'1px solid rgba(239,68,68,0.3)',
-            borderRadius:'6px', fontSize:'12px', cursor:'pointer', fontWeight:'600' }}>
-          🚪 Déconnexion
-        </button>
-      </div>
+      {profileBlock}
     </div>
   )
 }
