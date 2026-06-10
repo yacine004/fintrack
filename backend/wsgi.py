@@ -1,5 +1,5 @@
 from app import create_app
-from extensions import db
+from extensions import db, bcrypt
 
 app = create_app()
 
@@ -7,7 +7,6 @@ with app.app_context():
     db.create_all()
     print("✅ Tables créées sur Render")
 
-    # Seed des comptes de test
     from models import Utilisateur
     if db.session.query(Utilisateur).count() == 0:
         users = [
