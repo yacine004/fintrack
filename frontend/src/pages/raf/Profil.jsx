@@ -4,7 +4,7 @@ import axios from 'axios'
 import Sidebar from '../../components/Sidebar'
 
 const api = () => axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
 })
 
