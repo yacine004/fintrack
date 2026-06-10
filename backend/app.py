@@ -129,4 +129,5 @@ if __name__ == '__main__':
             db.session.commit()
             print("✅ Budgets créés")
 
+
     app.run(debug=True, port=5000)
