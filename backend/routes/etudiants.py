@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
 from extensions import db
-from models import Etudiant
+from models import Etudiant, Paiement
 
 etudiants_bp = Blueprint('etudiants', __name__)
 
@@ -198,4 +198,70 @@ def stats():
         'total':    total,
         'actifs':   actifs,
         'archives': archives
+    }), 200
+
+
+# ── PORTAIL PUBLIC : suivi paiements par matricule (sans JWT) ─────────────────
+# Tarifs annuels ISM Dakar École d'Ingénieurs et Digital Campus
+_TARIFS = {
+    'L1': 700_000, 'L2': 700_000, 'L3': 700_000,
+    'M1': 1_500_000, 'M2': 1_500_000,
+}
+
+@etudiants_bp.route('/suivi', methods=['GET'])
+def suivi_paiements():
+    matricule = request.args.get('matricule', '').strip().upper()
+    if not matricule:
+        return jsonify({'message': 'Matricule requis'}), 400
+
+    etudiant = db.session.query(Etudiant).filter_by(matricule=matricule).first()
+    if not etudiant:
+        return jsonify({'message': 'Aucun étudiant trouvé avec ce matricule'}), 404
+
+    paiements = (db.session.query(Paiement)
+                 .filter_by(id_etudiant=etudiant.id_etudiant)
+                 .order_by(Paiement.date_paiement.asc())
+                 .all())
+
+    tarif_annuel  = _TARIFS.get(etudiant.classe, 700_000)
+    total_paye    = sum(float(p.montant) for p in paiements)
+    solde_restant = max(0.0, tarif_annuel - total_paye)
+    a_jour        = total_paye >= tarif_annuel
+
+    # Répartition par semestre (S1 = janv-juin, S2 = juil-déc)
+    s1 = [p for p in paiements if p.date_paiement.month <= 6]
+    s2 = [p for p in paiements if p.date_paiement.month > 6]
+
+    return jsonify({
+        'etudiant': {
+            'matricule':        etudiant.matricule,
+            'nom':              etudiant.nom,
+            'prenom':           etudiant.prenom,
+            'classe':           etudiant.classe,
+            'filiere':          etudiant.filiere or '',
+            'annee_academique': etudiant.annee_academique,
+            'email':            etudiant.email or '',
+        },
+        'resume': {
+            'tarif_annuel':  tarif_annuel,
+            'total_paye':    total_paye,
+            'solde_restant': solde_restant,
+            'a_jour':        a_jour,
+            'nb_paiements':  len(paiements),
+            'total_s1':      sum(float(p.montant) for p in s1),
+            'total_s2':      sum(float(p.montant) for p in s2),
+        },
+        'paiements': [
+            {
+                'id':             p.id_paiement,
+                'reference':      p.reference or f'FT-{p.id_paiement:05d}',
+                'montant':        float(p.montant),
+                'mode_paiement':  p.mode_paiement,
+                'motif':          p.motif or '',
+                'caisse':         p.caisse.nom if p.caisse else '',
+                'date_paiement':  p.date_paiement.strftime('%d/%m/%Y'),
+                'semestre':       'S1' if p.date_paiement.month <= 6 else 'S2',
+            }
+            for p in paiements
+        ],
     }), 200

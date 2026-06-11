@@ -33,6 +33,9 @@ import RafNotifications      from './pages/raf/Notifications'
 import ComptableMessagerie   from './pages/comptable/Messagerie'
 import ComptableNotifications from './pages/raf/Notifications'
 
+// Public
+import SuiviPaiements from './pages/SuiviPaiements'
+
 function PrivateRoute({ children, role }) {
   const user  = JSON.parse(localStorage.getItem('user') || 'null')
   const token = localStorage.getItem('token')
@@ -46,6 +49,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/suivi-paiements" element={<SuiviPaiements />} />
 
         {/* ── RAF ── */}
         <Route path="/raf/dashboard"    element={<PrivateRoute role="raf"><RafDashboard /></PrivateRoute>} />

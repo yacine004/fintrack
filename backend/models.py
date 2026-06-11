@@ -87,6 +87,7 @@ class Paiement(db.Model):
     date_paiement = db.Column(db.DateTime, default=datetime.utcnow)
     def to_dict(self):
         return {'id': self.id_paiement, 'id_etudiant': self.id_etudiant,
+                'matricule': self.etudiant.matricule if self.etudiant else '',
                 'etudiant': f"{self.etudiant.prenom} {self.etudiant.nom}" if self.etudiant else '',
                 'id_caisse': self.id_caisse, 'caisse': self.caisse.nom if self.caisse else '',
                 'montant': float(self.montant), 'mode_paiement': self.mode_paiement,
