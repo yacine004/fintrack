@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ── Prometheus lui-même ──────────────────────────────
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ── Backend Flask ────────────────────────────────────
+  - job_name: 'fintrack_backend'
+    static_configs:
+      - targets: ['fintrack_backend:5000']
+    metrics_path: '/metrics'
+
+  # ── Conteneurs Docker (node exporter) ───────────────
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['172.17.0.1:9323']
