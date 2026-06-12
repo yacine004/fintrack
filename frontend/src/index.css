@@ -54,13 +54,21 @@
   }
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
   overflow-x: hidden;
+  min-height: 100%;
+  /* Safari mobile: fill available height excluding browser chrome */
+  min-height: -webkit-fill-available;
 }
 
 #root {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 @media (max-width: 768px) {

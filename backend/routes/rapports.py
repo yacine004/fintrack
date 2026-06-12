@@ -176,109 +176,197 @@ def exporter(rid):
         return jsonify({'message': 'Format invalide'}), 400
 
 
+MODE_LABELS_R = {
+    'especes':  'Espèces',
+    'virement': 'Virement bancaire',
+    'cheque':   'Chèque',
+    'wave':     'Wave / Mobile Money',
+}
+
+TYPE_LABELS = {'mensuel': 'Mensuel', 'trimestriel': 'Trimestriel',
+               'annuel': 'Annuel', 'personnalise': 'Personnalisé'}
+
+
 def _export_pdf(rapport, donnees):
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                        Table, TableStyle, HRFlowable)
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
         buffer = io.BytesIO()
         doc    = SimpleDocTemplate(buffer, pagesize=A4,
-                                   rightMargin=2*cm, leftMargin=2*cm,
-                                   topMargin=2*cm, bottomMargin=2*cm)
+                                   rightMargin=1.8*cm, leftMargin=1.8*cm,
+                                   topMargin=1.5*cm, bottomMargin=1.5*cm)
 
         BLUE  = colors.HexColor('#1B3A6B')
-        GREEN = colors.HexColor('#27AE60')
+        LBLUE = colors.HexColor('#2D5FA8')
+        GREEN = colors.HexColor('#16A34A')
         RED   = colors.HexColor('#DC2626')
         GRAY  = colors.HexColor('#64748B')
-        LIGHT = colors.HexColor('#F1F5F9')
+        LGRAY = colors.HexColor('#F1F5F9')
+        BGRAY = colors.HexColor('#E2E8F0')
+        WHITE = colors.white
 
-        styles   = getSampleStyleSheet()
-        elements = []
+        type_lbl   = TYPE_LABELS.get(donnees['type'], donnees['type'].capitalize())
+        solde_net  = donnees['solde_net']
+        gen_date   = rapport.date_creation.strftime('%d/%m/%Y à %H:%M')
+        elems      = []
 
-        s_title  = ParagraphStyle('t', fontSize=20, textColor=BLUE, alignment=TA_CENTER, fontName='Helvetica-Bold')
-        s_sub    = ParagraphStyle('s', fontSize=11, textColor=GRAY, alignment=TA_CENTER)
-        s_h2     = ParagraphStyle('h2', fontSize=13, textColor=BLUE, fontName='Helvetica-Bold', spaceBefore=12, spaceAfter=6)
-        s_normal = ParagraphStyle('n', fontSize=10)
-
-        elements.append(Paragraph('FinTrack — Rapport Financier', s_title))
-        elements.append(Paragraph('ISM Dakar — Plateforme de Gestion Financière', s_sub))
-        elements.append(HRFlowable(width='100%', thickness=2, color=BLUE))
-        elements.append(Spacer(1, 0.4*cm))
-
-        # En-tête rapport
-        type_label = {'mensuel': 'Mensuel', 'trimestriel': 'Trimestriel', 'annuel': 'Annuel'}
-        elements.append(Paragraph(
-            f'Rapport {type_label.get(donnees["type"], "")} — Période : {donnees["periode"]}',
-            ParagraphStyle('rh', fontSize=14, textColor=colors.white, alignment=TA_CENTER,
-                           fontName='Helvetica-Bold', backColor=BLUE, borderPadding=10)
-        ))
-        elements.append(Spacer(1, 0.3*cm))
-        elements.append(Paragraph(
-            f'Du {donnees["debut"]} au {donnees["fin"]}  |  Caisse : {donnees["nom_caisse"]}  |  Généré le {rapport.date_creation.strftime("%d/%m/%Y à %H:%M")}',
-            ParagraphStyle('dt', fontSize=10, textColor=GRAY, alignment=TA_CENTER)
-        ))
-        elements.append(Spacer(1, 0.5*cm))
-
-        # KPIs
-        kpi_data = [
-            ['Indicateur', 'Valeur'],
-            ['Total recettes', f"{donnees['total_recettes']:,.0f} FCFA".replace(',', ' ')],
-            ['Total dépenses', f"{donnees['total_depenses']:,.0f} FCFA".replace(',', ' ')],
-            ['Solde net', f"{donnees['solde_net']:,.0f} FCFA".replace(',', ' ')],
-            ['Nombre de paiements', str(donnees['nb_paiements'])],
-        ]
-        kpi_table = Table(kpi_data, colWidths=[8*cm, 8*cm])
-        kpi_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), BLUE),
-            ('TEXTCOLOR',  (0,0), (-1,0), colors.white),
-            ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
-            ('FONTSIZE',   (0,0), (-1,-1), 11),
-            ('FONTNAME',   (0,1), (0,-1), 'Helvetica-Bold'),
-            ('TEXTCOLOR',  (0,1), (0,-1), BLUE),
-            ('ROWBACKGROUNDS', (0,1), (-1,-1), [LIGHT, colors.white]),
-            ('GRID',       (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-            ('PADDING',    (0,0), (-1,-1), 8),
-            ('TEXTCOLOR',  (1,3), (1,3), GREEN if donnees['solde_net'] >= 0 else RED),
-            ('FONTNAME',   (1,3), (1,3), 'Helvetica-Bold'),
+        # ── EN-TÊTE établissement ─────────────────────────────────────────────
+        hdr = [[
+            Paragraph(
+                '<b>ISM DAKAR</b><br/>École d\'Ingénieurs et Digital Campus<br/>'
+                'BP 3278 — Dakar, Sénégal | www.ism.edu.sn',
+                ParagraphStyle('hl', fontSize=10, textColor=WHITE,
+                               fontName='Helvetica-Bold', leading=15)),
+            Paragraph(
+                f'<b>RAPPORT FINANCIER</b><br/>{type_lbl}<br/>'
+                f'Généré le {gen_date}',
+                ParagraphStyle('hr', fontSize=9.5, textColor=WHITE,
+                               fontName='Helvetica', leading=14, alignment=TA_RIGHT)),
+        ]]
+        ht = Table(hdr, colWidths=[10*cm, 7*cm])
+        ht.setStyle(TableStyle([
+            ('BACKGROUND', (0,0),(-1,-1), BLUE),
+            ('PADDING',    (0,0),(-1,-1), 14),
+            ('VALIGN',     (0,0),(-1,-1), 'MIDDLE'),
         ]))
-        elements.append(kpi_table)
-        elements.append(Spacer(1, 0.5*cm))
+        elems.append(ht)
 
-        # Paiements récents
+        # ── BANDEAU PÉRIODE ───────────────────────────────────────────────────
+        elems.append(Table(
+            [[Paragraph(
+                f'Période : {donnees["debut"]} → {donnees["fin"]}  |  Caisse : {donnees["nom_caisse"]}',
+                ParagraphStyle('p', fontSize=10, textColor=WHITE,
+                               fontName='Helvetica-Bold', alignment=TA_CENTER))]],
+            colWidths=[17*cm],
+            style=[('BACKGROUND',(0,0),(-1,-1), LBLUE), ('PADDING',(0,0),(-1,-1), 7)]
+        ))
+        elems.append(Spacer(1, 0.5*cm))
+
+        # ── KPI CARDS (3 colonnes) ────────────────────────────────────────────
+        def kpi_cell(label, valeur, couleur):
+            return Paragraph(
+                f'<font size="8" color="#64748B">{label}</font><br/>'
+                f'<font size="16"><b>{valeur}</b></font>',
+                ParagraphStyle('k', alignment=TA_CENTER, textColor=couleur, leading=20))
+
+        kpi_row = [[
+            kpi_cell('TOTAL RECETTES',
+                     f"{donnees['total_recettes']:,.0f} FCFA".replace(',', ' '), GREEN),
+            kpi_cell('TOTAL DÉPENSES',
+                     f"{donnees['total_depenses']:,.0f} FCFA".replace(',', ' '), RED),
+            kpi_cell('SOLDE NET',
+                     f"{solde_net:,.0f} FCFA".replace(',', ' '),
+                     GREEN if solde_net >= 0 else RED),
+            kpi_cell('NB. PAIEMENTS', str(donnees['nb_paiements']), BLUE),
+        ]]
+        kpi_t = Table(kpi_row, colWidths=[4.25*cm]*4)
+        kpi_t.setStyle(TableStyle([
+            ('BACKGROUND', (0,0),(0,-1), colors.HexColor('#F0FDF4')),
+            ('BACKGROUND', (1,0),(1,-1), colors.HexColor('#FEF2F2')),
+            ('BACKGROUND', (2,0),(2,-1),
+             colors.HexColor('#F0FDF4') if solde_net >= 0 else colors.HexColor('#FEF2F2')),
+            ('BACKGROUND', (3,0),(3,-1), colors.HexColor('#EFF6FF')),
+            ('BOX',   (0,0),(0,-1), 1, GREEN),
+            ('BOX',   (1,0),(1,-1), 1, RED),
+            ('BOX',   (2,0),(2,-1), 1, GREEN if solde_net >= 0 else RED),
+            ('BOX',   (3,0),(3,-1), 1, BLUE),
+            ('PADDING',    (0,0),(-1,-1), 12),
+            ('VALIGN',     (0,0),(-1,-1), 'MIDDLE'),
+            ('LEFTPADDING',(0,0),(-1,-1), 6),
+        ]))
+        elems.append(kpi_t)
+        elems.append(Spacer(1, 0.6*cm))
+
+        # ── TABLEAU PAIEMENTS ─────────────────────────────────────────────────
         if donnees['paiements']:
-            elements.append(Paragraph('Détail des Paiements', s_h2))
-            p_data = [['Étudiant', 'Montant (FCFA)', 'Mode', 'Date']]
-            for p in donnees['paiements'][:20]:
+            elems.append(Paragraph('DÉTAIL DES ENCAISSEMENTS',
+                ParagraphStyle('sh', fontSize=9, textColor=BLUE,
+                               fontName='Helvetica-Bold', spaceAfter=5)))
+            p_data = [['N°', 'Étudiant', 'Montant (FCFA)', 'Mode', 'Caisse', 'Date']]
+            for i, p in enumerate(donnees['paiements'], 1):
                 p_data.append([
+                    str(i),
                     p.get('etudiant', ''),
                     f"{float(p['montant']):,.0f}".replace(',', ' '),
-                    p.get('mode_paiement', '').capitalize(),
-                    p.get('date_paiement', '')
+                    MODE_LABELS_R.get(p.get('mode_paiement', ''), p.get('mode_paiement', '')),
+                    p.get('caisse', ''),
+                    p.get('date_paiement', '')[:10] if p.get('date_paiement') else '',
                 ])
-            p_table = Table(p_data, colWidths=[5*cm, 4*cm, 3*cm, 4*cm])
-            p_table.setStyle(TableStyle([
-                ('BACKGROUND', (0,0), (-1,0), BLUE),
-                ('TEXTCOLOR',  (0,0), (-1,0), colors.white),
-                ('FONTNAME',   (0,0), (-1,0), 'Helvetica-Bold'),
-                ('FONTSIZE',   (0,0), (-1,-1), 9),
-                ('ROWBACKGROUNDS', (0,1), (-1,-1), [LIGHT, colors.white]),
-                ('GRID',       (0,0), (-1,-1), 0.3, colors.HexColor('#E2E8F0')),
-                ('PADDING',    (0,0), (-1,-1), 6),
+            p_t = Table(p_data, colWidths=[0.8*cm, 4.5*cm, 3.2*cm, 3*cm, 3*cm, 2.5*cm])
+            p_t.setStyle(TableStyle([
+                ('BACKGROUND',    (0,0),(-1,0), BLUE),
+                ('TEXTCOLOR',     (0,0),(-1,0), WHITE),
+                ('FONTNAME',      (0,0),(-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE',      (0,0),(-1,-1), 8),
+                ('ROWBACKGROUNDS',(0,1),(-1,-1), [LGRAY, WHITE]),
+                ('GRID',          (0,0),(-1,-1), 0.3, BGRAY),
+                ('ALIGN',         (0,0),(-1,-1), 'CENTER'),
+                ('ALIGN',         (1,1),(1,-1), 'LEFT'),
+                ('PADDING',       (0,0),(-1,-1), 5),
             ]))
-            elements.append(p_table)
+            elems.append(p_t)
+            elems.append(Spacer(1, 0.5*cm))
 
-        elements.append(Spacer(1, 1*cm))
-        elements.append(HRFlowable(width='100%', thickness=1, color=BLUE))
-        elements.append(Paragraph(
-            'Ce rapport est généré automatiquement par FinTrack — ISM Dakar',
-            ParagraphStyle('f', fontSize=9, textColor=GRAY, alignment=TA_CENTER)
+        # ── TABLEAU DÉPENSES ──────────────────────────────────────────────────
+        if donnees['depenses']:
+            elems.append(Paragraph('DÉTAIL DES DÉPENSES VALIDÉES',
+                ParagraphStyle('sh2', fontSize=9, textColor=BLUE,
+                               fontName='Helvetica-Bold', spaceAfter=5)))
+            d_data = [['N°', 'Motif', 'Montant (FCFA)', 'Catégorie', 'Caisse', 'Date']]
+            for i, d in enumerate(donnees['depenses'], 1):
+                d_data.append([
+                    str(i),
+                    d.get('motif', ''),
+                    f"{float(d['montant']):,.0f}".replace(',', ' '),
+                    d.get('categorie', ''),
+                    d.get('caisse', ''),
+                    d.get('date_depense', '')[:10] if d.get('date_depense') else '',
+                ])
+            d_t = Table(d_data, colWidths=[0.8*cm, 4.5*cm, 3.2*cm, 3*cm, 3*cm, 2.5*cm])
+            d_t.setStyle(TableStyle([
+                ('BACKGROUND',    (0,0),(-1,0), colors.HexColor('#7F1D1D')),
+                ('TEXTCOLOR',     (0,0),(-1,0), WHITE),
+                ('FONTNAME',      (0,0),(-1,0), 'Helvetica-Bold'),
+                ('FONTSIZE',      (0,0),(-1,-1), 8),
+                ('ROWBACKGROUNDS',(0,1),(-1,-1), [colors.HexColor('#FEF2F2'), WHITE]),
+                ('GRID',          (0,0),(-1,-1), 0.3, BGRAY),
+                ('ALIGN',         (0,0),(-1,-1), 'CENTER'),
+                ('ALIGN',         (1,1),(1,-1), 'LEFT'),
+                ('PADDING',       (0,0),(-1,-1), 5),
+            ]))
+            elems.append(d_t)
+            elems.append(Spacer(1, 0.5*cm))
+
+        # ── SIGNATURE RAF ─────────────────────────────────────────────────────
+        elems.append(Spacer(1, 0.3*cm))
+        sig_t = Table(
+            [[Paragraph('Le Responsable Administratif et Financier (RAF)',
+                ParagraphStyle('sc', fontSize=9, fontName='Helvetica-Bold',
+                               textColor=BLUE, alignment=TA_RIGHT)),
+              ''],
+             [Paragraph('<br/><br/>Signature et cachet :',
+                ParagraphStyle('ss', fontSize=8, textColor=GRAY, alignment=TA_RIGHT)),
+              '']],
+            colWidths=[10*cm, 7*cm]
+        )
+        elems.append(sig_t)
+
+        # ── PIED DE PAGE ──────────────────────────────────────────────────────
+        elems.append(Spacer(1, 0.3*cm))
+        elems.append(HRFlowable(width='100%', thickness=1, color=BLUE))
+        elems.append(Paragraph(
+            f'FinTrack — ISM Dakar École d\'Ingénieurs et Digital Campus  |  '
+            f'Rapport {type_lbl}  |  {donnees["debut"]} → {donnees["fin"]}',
+            ParagraphStyle('ft', fontSize=7.5, textColor=GRAY, alignment=TA_CENTER)
         ))
 
-        doc.build(elements)
+        doc.build(elems)
         buffer.seek(0)
 
         return send_file(buffer, mimetype='application/pdf', as_attachment=False,
@@ -286,6 +374,8 @@ def _export_pdf(rapport, donnees):
 
     except ImportError:
         return jsonify({'message': 'ReportLab non installé'}), 500
+    except Exception as e:
+        return jsonify({'message': f'Erreur PDF : {str(e)}'}), 500
 
 
 def _export_excel(rapport, donnees):
@@ -294,90 +384,173 @@ def _export_excel(rapport, donnees):
         from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
         from openpyxl.utils import get_column_letter
 
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = f"Rapport {donnees['type']}"
-
         BLUE_FILL  = PatternFill(start_color='1B3A6B', end_color='1B3A6B', fill_type='solid')
-        GREEN_FILL = PatternFill(start_color='E8F5E9', end_color='E8F5E9', fill_type='solid')
-        LIGHT_FILL = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
-        WHITE_FONT = Font(color='FFFFFF', bold=True, size=12)
+        LBLUE_FILL = PatternFill(start_color='2D5FA8', end_color='2D5FA8', fill_type='solid')
+        GREEN_FILL = PatternFill(start_color='F0FDF4', end_color='F0FDF4', fill_type='solid')
+        RED_FILL   = PatternFill(start_color='FEF2F2', end_color='FEF2F2', fill_type='solid')
+        ALT_FILL   = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
+        LGRAY_FILL = PatternFill(start_color='F1F5F9', end_color='F1F5F9', fill_type='solid')
+        WHITE_FONT = Font(color='FFFFFF', bold=True, size=11)
         BLUE_FONT  = Font(color='1B3A6B', bold=True, size=11)
         THIN = Border(
-            left=Side(style='thin', color='E2E8F0'),
-            right=Side(style='thin', color='E2E8F0'),
-            top=Side(style='thin', color='E2E8F0'),
-            bottom=Side(style='thin', color='E2E8F0')
+            left=Side(style='thin', color='E2E8F0'), right=Side(style='thin', color='E2E8F0'),
+            top=Side(style='thin', color='E2E8F0'),  bottom=Side(style='thin', color='E2E8F0')
         )
+        CENTER = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        LEFT   = Alignment(horizontal='left',   vertical='center', wrap_text=True)
 
-        # Titre
-        ws.merge_cells('A1:E1')
-        ws['A1'] = f'FinTrack — Rapport {donnees["type"].capitalize()} — {donnees["periode"]}'
-        ws['A1'].font = Font(color='FFFFFF', bold=True, size=14)
-        ws['A1'].fill = BLUE_FILL
-        ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
-        ws.row_dimensions[1].height = 35
+        type_lbl = TYPE_LABELS.get(donnees['type'], donnees['type'].capitalize())
+        wb = openpyxl.Workbook()
 
-        ws.merge_cells('A2:E2')
-        ws['A2'] = f'Période : {donnees["debut"]} → {donnees["fin"]}  |  Caisse : {donnees["nom_caisse"]}'
-        ws['A2'].alignment = Alignment(horizontal='center')
-        ws['A2'].font = Font(color='64748B', size=11)
+        # ── Feuille 1 : RÉSUMÉ ────────────────────────────────────────────────
+        ws1 = wb.active
+        ws1.title = 'Résumé'
+        ws1.sheet_view.showGridLines = False
 
-        # KPIs
-        ws['A4'] = 'INDICATEURS CLÉS'
-        ws['A4'].font = BLUE_FONT
-        ws['A4'].fill = LIGHT_FILL
+        # Ligne 1 : titre établissement
+        ws1.merge_cells('A1:F1')
+        ws1['A1'] = 'ISM DAKAR — École d\'Ingénieurs et Digital Campus'
+        ws1['A1'].font  = WHITE_FONT
+        ws1['A1'].fill  = BLUE_FILL
+        ws1['A1'].alignment = CENTER
+        ws1.row_dimensions[1].height = 30
+
+        # Ligne 2 : sous-titre rapport
+        ws1.merge_cells('A2:F2')
+        ws1['A2'] = (f'Rapport Financier {type_lbl} | Période : {donnees["debut"]} → {donnees["fin"]} | '
+                     f'Caisse : {donnees["nom_caisse"]} | Généré le {rapport.date_creation.strftime("%d/%m/%Y")}')
+        ws1['A2'].font      = Font(color='FFFFFF', size=10)
+        ws1['A2'].fill      = LBLUE_FILL
+        ws1['A2'].alignment = CENTER
+        ws1.row_dimensions[2].height = 22
+
+        # Ligne 4 : en-têtes KPI
+        ws1.merge_cells('A4:B4')
+        ws1['A4'] = 'INDICATEURS CLÉS'
+        ws1['A4'].font  = BLUE_FONT
+        ws1['A4'].fill  = LGRAY_FILL
+        ws1['A4'].alignment = CENTER
+        ws1.row_dimensions[4].height = 20
 
         kpis = [
-            ('Total recettes', donnees['total_recettes']),
-            ('Total dépenses', donnees['total_depenses']),
-            ('Solde net', donnees['solde_net']),
-            ('Nombre de paiements', donnees['nb_paiements']),
+            ('Total recettes',       donnees['total_recettes'],    '16A34A', GREEN_FILL),
+            ('Total dépenses',       donnees['total_depenses'],    'DC2626', RED_FILL),
+            ('Solde net',            donnees['solde_net'],
+             '16A34A' if donnees['solde_net'] >= 0 else 'DC2626',
+             GREEN_FILL if donnees['solde_net'] >= 0 else RED_FILL),
+            ('Nombre de paiements',  donnees['nb_paiements'],      '1B3A6B', LGRAY_FILL),
+            ('Nombre de dépenses',   len(donnees['depenses']),     '1B3A6B', LGRAY_FILL),
         ]
-        for i, (label, val) in enumerate(kpis, start=5):
-            ws[f'A{i}'] = label
-            ws[f'A{i}'].font = Font(bold=True)
-            ws[f'B{i}'] = val
-            ws[f'B{i}'].font = Font(
-                color='27AE60' if (label == 'Solde net' and val >= 0) else
-                      'DC2626' if (label == 'Solde net' and val < 0) else '000000',
-                bold=True
-            )
-            ws[f'B{i}'].number_format = '#,##0'
+        for i, (label, val, color, fill) in enumerate(kpis, start=5):
+            ws1.row_dimensions[i].height = 22
+            ws1[f'A{i}'] = label
+            ws1[f'A{i}'].font      = Font(bold=True, size=10)
+            ws1[f'A{i}'].alignment = LEFT
+            ws1[f'A{i}'].border    = THIN
+            ws1[f'B{i}'] = val
+            ws1[f'B{i}'].font          = Font(color=color, bold=True, size=11)
+            ws1[f'B{i}'].number_format = '#,##0'
+            ws1[f'B{i}'].fill          = fill
+            ws1[f'B{i}'].alignment     = CENTER
+            ws1[f'B{i}'].border        = THIN
+            ws1[f'A{i}'].fill          = LGRAY_FILL
 
-        # Paiements
-        if donnees['paiements']:
-            row = 11
-            ws.merge_cells(f'A{row}:E{row}')
-            ws[f'A{row}'] = 'DÉTAIL DES PAIEMENTS'
-            ws[f'A{row}'].font = WHITE_FONT
-            ws[f'A{row}'].fill = BLUE_FILL
-            ws[f'A{row}'].alignment = Alignment(horizontal='center')
-            row += 1
+        ws1.column_dimensions['A'].width = 28
+        ws1.column_dimensions['B'].width = 22
 
-            headers = ['Étudiant', 'Montant (FCFA)', 'Mode', 'Caisse', 'Date']
-            for col, h in enumerate(headers, start=1):
-                cell = ws.cell(row=row, column=col, value=h)
-                cell.font = Font(bold=True, color='1B3A6B')
-                cell.fill = LIGHT_FILL
-                cell.border = THIN
-            row += 1
+        # ── Feuille 2 : PAIEMENTS ─────────────────────────────────────────────
+        ws2 = wb.create_sheet('Paiements')
+        ws2.sheet_view.showGridLines = False
 
-            for p in donnees['paiements']:
-                vals = [p.get('etudiant',''), float(p['montant']),
-                        p.get('mode_paiement',''), p.get('caisse',''), p.get('date_paiement','')]
-                for col, val in enumerate(vals, start=1):
-                    cell = ws.cell(row=row, column=col, value=val)
-                    cell.border = THIN
-                    if col == 2:
-                        cell.number_format = '#,##0'
-                    if row % 2 == 0:
-                        cell.fill = PatternFill(start_color='F8FAFC', end_color='F8FAFC', fill_type='solid')
-                row += 1
+        ws2.merge_cells('A1:G1')
+        ws2['A1'] = f'Détail des Paiements — {donnees["debut"]} → {donnees["fin"]}'
+        ws2['A1'].font  = WHITE_FONT
+        ws2['A1'].fill  = BLUE_FILL
+        ws2['A1'].alignment = CENTER
+        ws2.row_dimensions[1].height = 28
 
-        # Largeurs colonnes
-        for col in range(1, 6):
-            ws.column_dimensions[get_column_letter(col)].width = 22
+        p_headers = ['N°', 'Matricule', 'Étudiant', 'Montant (FCFA)', 'Mode', 'Caisse', 'Date']
+        for col, h in enumerate(p_headers, 1):
+            c = ws2.cell(row=2, column=col, value=h)
+            c.font      = Font(color='1B3A6B', bold=True, size=10)
+            c.fill      = LGRAY_FILL
+            c.border    = THIN
+            c.alignment = CENTER
+        ws2.row_dimensions[2].height = 20
+
+        for i, p in enumerate(donnees['paiements'], 1):
+            row = i + 2
+            vals = [
+                i,
+                p.get('matricule', ''),
+                p.get('etudiant', ''),
+                float(p['montant']),
+                MODE_LABELS_R.get(p.get('mode_paiement',''), p.get('mode_paiement','')),
+                p.get('caisse', ''),
+                p.get('date_paiement', '')[:10] if p.get('date_paiement') else '',
+            ]
+            fill = ALT_FILL if i % 2 == 0 else None
+            for col, val in enumerate(vals, 1):
+                c = ws2.cell(row=row, column=col, value=val)
+                c.border    = THIN
+                c.alignment = CENTER if col != 3 else LEFT
+                if col == 4:
+                    c.number_format = '#,##0'
+                    c.font = Font(color='16A34A', bold=True)
+                if fill:
+                    c.fill = fill
+            ws2.row_dimensions[row].height = 18
+
+        col_widths_p = [5, 14, 24, 18, 20, 18, 12]
+        for i, w in enumerate(col_widths_p, 1):
+            ws2.column_dimensions[get_column_letter(i)].width = w
+
+        # ── Feuille 3 : DÉPENSES ──────────────────────────────────────────────
+        ws3 = wb.create_sheet('Dépenses')
+        ws3.sheet_view.showGridLines = False
+
+        ws3.merge_cells('A1:G1')
+        ws3['A1'] = f'Dépenses Validées — {donnees["debut"]} → {donnees["fin"]}'
+        ws3['A1'].font  = Font(color='FFFFFF', bold=True, size=11)
+        ws3['A1'].fill  = PatternFill(start_color='7F1D1D', end_color='7F1D1D', fill_type='solid')
+        ws3['A1'].alignment = CENTER
+        ws3.row_dimensions[1].height = 28
+
+        d_headers = ['N°', 'Motif', 'Montant (FCFA)', 'Catégorie', 'Caisse', 'Statut', 'Date']
+        for col, h in enumerate(d_headers, 1):
+            c = ws3.cell(row=2, column=col, value=h)
+            c.font      = Font(color='7F1D1D', bold=True, size=10)
+            c.fill      = PatternFill(start_color='FEF2F2', end_color='FEF2F2', fill_type='solid')
+            c.border    = THIN
+            c.alignment = CENTER
+        ws3.row_dimensions[2].height = 20
+
+        for i, d in enumerate(donnees['depenses'], 1):
+            row = i + 2
+            vals = [
+                i,
+                d.get('motif', ''),
+                float(d['montant']),
+                d.get('categorie', ''),
+                d.get('caisse', ''),
+                d.get('statut', '').replace('_', ' ').capitalize(),
+                d.get('date_depense', '')[:10] if d.get('date_depense') else '',
+            ]
+            fill = ALT_FILL if i % 2 == 0 else None
+            for col, val in enumerate(vals, 1):
+                c = ws3.cell(row=row, column=col, value=val)
+                c.border    = THIN
+                c.alignment = CENTER if col != 2 else LEFT
+                if col == 3:
+                    c.number_format = '#,##0'
+                    c.font = Font(color='DC2626', bold=True)
+                if fill:
+                    c.fill = fill
+            ws3.row_dimensions[row].height = 18
+
+        col_widths_d = [5, 32, 18, 16, 18, 14, 12]
+        for i, w in enumerate(col_widths_d, 1):
+            ws3.column_dimensions[get_column_letter(i)].width = w
 
         buffer = io.BytesIO()
         wb.save(buffer)
@@ -390,3 +563,5 @@ def _export_excel(rapport, donnees):
 
     except ImportError:
         return jsonify({'message': 'openpyxl non installé. Exécutez : pip install openpyxl'}), 500
+    except Exception as e:
+        return jsonify({'message': f'Erreur Excel : {str(e)}'}), 500

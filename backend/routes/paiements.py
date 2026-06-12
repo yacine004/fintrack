@@ -165,6 +165,54 @@ def detail(pid):
 
 
 # ── GÉNÉRER REÇU PDF ──────────────────────────────────────────────────────────
+def _montant_en_lettres(n):
+    """Convertit un entier en toutes lettres (français, jusqu'à 9 999 999)."""
+    _units = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf',
+              'dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize',
+              'dix-sept', 'dix-huit', 'dix-neuf']
+    _tens  = ['', '', 'vingt', 'trente', 'quarante', 'cinquante',
+              'soixante', 'soixante', 'quatre-vingt', 'quatre-vingt']
+
+    def _lt100(x):
+        if x == 0: return ''
+        if x < 20: return _units[x]
+        t, u = divmod(x, 10)
+        if t == 7:  return 'soixante-' + _units[10 + u]
+        if t == 9:  return ('quatre-vingt-' + _units[10 + u]) if u else 'quatre-vingt-dix'
+        sep = '-et-' if u == 1 and t != 8 else ('-' if u else '')
+        return _tens[t] + sep + _units[u]
+
+    def _lt1000(x):
+        if x == 0: return ''
+        h, rem = divmod(x, 100)
+        if h == 0: return _lt100(rem)
+        cent = 'cent' if h == 1 else _units[h] + ' cent'
+        return (cent + ' ' + _lt100(rem)).strip() if rem else cent
+
+    def _words(x):
+        if x == 0: return 'zero'
+        if x >= 1_000_000:
+            m, rest = divmod(x, 1_000_000)
+            s = _lt1000(m) + ' million' + ('s' if m > 1 else '')
+            return (s + ' ' + _words(rest)).strip() if rest else s
+        if x >= 1000:
+            m, rest = divmod(x, 1000)
+            prefix = 'mille' if m == 1 else _lt1000(m) + ' mille'
+            return (prefix + ' ' + _lt1000(rest)).strip() if rest else prefix
+        return _lt1000(x)
+
+    n = int(round(n))
+    return _words(n) if n else 'zero'
+
+
+MODE_LABELS = {
+    'especes':  'Espèces',
+    'virement': 'Virement bancaire',
+    'cheque':   'Chèque',
+    'wave':     'Wave / Mobile Money',
+}
+
+
 @paiements_bp.route('/<int:pid>/recu', methods=['GET'])
 @auth_required
 def generer_recu(pid):
@@ -176,122 +224,214 @@ def generer_recu(pid):
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                        Table, TableStyle, HRFlowable)
+        from reportlab.lib.styles import ParagraphStyle
         from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 
         buffer = io.BytesIO()
         doc    = SimpleDocTemplate(buffer, pagesize=A4,
-                                   rightMargin=2*cm, leftMargin=2*cm,
-                                   topMargin=2*cm, bottomMargin=2*cm)
+                                   rightMargin=1.8*cm, leftMargin=1.8*cm,
+                                   topMargin=1.5*cm, bottomMargin=1.5*cm)
 
-        styles   = getSampleStyleSheet()
-        elements = []
+        BLUE   = colors.HexColor('#1B3A6B')
+        LBLUE  = colors.HexColor('#2D5FA8')
+        GREEN  = colors.HexColor('#16A34A')
+        GRAY   = colors.HexColor('#64748B')
+        LGRAY  = colors.HexColor('#F1F5F9')
+        BGRAY  = colors.HexColor('#E2E8F0')
+        WHITE  = colors.white
 
-        BLUE  = colors.HexColor('#1B3A6B')
-        GREEN = colors.HexColor('#27AE60')
-        GRAY  = colors.HexColor('#64748B')
-        LIGHT = colors.HexColor('#F1F5F9')
-
-        style_title  = ParagraphStyle('title',  fontSize=22, textColor=BLUE, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceAfter=4)
-        style_sub    = ParagraphStyle('sub',    fontSize=11, textColor=GRAY, alignment=TA_CENTER, spaceAfter=2)
-        style_h2     = ParagraphStyle('h2',     fontSize=13, textColor=BLUE, fontName='Helvetica-Bold', spaceBefore=12, spaceAfter=6)
-        style_normal = ParagraphStyle('normal', fontSize=11, textColor=colors.black)
-        style_green  = ParagraphStyle('green',  fontSize=18, textColor=GREEN, fontName='Helvetica-Bold', alignment=TA_CENTER)
-
-        # En-tête
-        elements.append(Paragraph('FinTrack', style_title))
-        elements.append(Paragraph('Plateforme de Gestion Financière — ISM Dakar', style_sub))
-        elements.append(HRFlowable(width='100%', thickness=2, color=BLUE))
-        elements.append(Spacer(1, 0.5*cm))
-
-        # Titre reçu
-        elements.append(Paragraph('REÇU DE PAIEMENT', ParagraphStyle('rtitle', fontSize=16,
-            textColor=colors.white, alignment=TA_CENTER, fontName='Helvetica-Bold',
-            backColor=BLUE, borderPadding=10)))
-        elements.append(Spacer(1, 0.4*cm))
-
-        # Numéro et date
-        elements.append(Paragraph(f'N° : FT-{paiement.id_paiement:05d}', ParagraphStyle('ref',
-            fontSize=11, textColor=GRAY, alignment=TA_RIGHT)))
-        elements.append(Paragraph(f'Date : {paiement.date_paiement.strftime("%d/%m/%Y à %H:%M")}',
-            ParagraphStyle('date', fontSize=11, textColor=GRAY, alignment=TA_RIGHT)))
-        elements.append(Spacer(1, 0.5*cm))
-
-        # Montant
-        elements.append(Paragraph(f'{float(paiement.montant):,.0f} FCFA'.replace(',', ' '), style_green))
-        elements.append(Spacer(1, 0.4*cm))
-        elements.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#E2E8F0')))
-        elements.append(Spacer(1, 0.3*cm))
-
-        # Détails
         etudiant = paiement.etudiant
         caisse   = paiement.caisse
+        montant  = float(paiement.montant)
+        num_recu = f'FT-{paiement.id_paiement:05d}'
+        date_str = paiement.date_paiement.strftime('%d/%m/%Y')
+        heure_str = paiement.date_paiement.strftime('%H:%M')
+        mode_label = MODE_LABELS.get(paiement.mode_paiement, paiement.mode_paiement)
+        montant_fmt = f"{montant:,.0f}".replace(',', ' ') + ' FCFA'
+        montant_lettres = _montant_en_lettres(montant).capitalize() + ' francs CFA'
 
-        data = [
-            ['ÉTUDIANT', ''],
-            ['Nom complet', f'{etudiant.prenom} {etudiant.nom}' if etudiant else 'N/A'],
-            ['Matricule', etudiant.matricule if etudiant else 'N/A'],
-            ['Classe / Filière', f'{etudiant.classe} — {etudiant.filiere or ""}' if etudiant else 'N/A'],
-            ['', ''],
-            ['PAIEMENT', ''],
-            ['Mode de paiement', paiement.mode_paiement.capitalize()],
-            ['Caisse', caisse.nom if caisse else 'N/A'],
-            ['Motif', paiement.motif or 'Paiement scolarité'],
-            ['Référence', paiement.reference or '—'],
+        elems = []
+
+        # ── EN-TÊTE : bandeau bleu avec logo + infos école ────────────────────
+        header_data = [[
+            Paragraph(
+                '<b>ISM DAKAR</b><br/>'
+                'École d\'Ingénieurs et Digital Campus<br/>'
+                'BP 3278 - Dakar, Senegal<br/>'
+                'Tél : +221 33 825 00 00 | www.ism.edu.sn',
+                ParagraphStyle('hl', fontSize=9.5, textColor=WHITE,
+                               fontName='Helvetica-Bold', leading=14)
+            ),
+            Paragraph(
+                f'<b>REÇU N°</b><br/><font size="18"><b>{num_recu}</b></font><br/>'
+                f'Date : {date_str}<br/>Heure : {heure_str}',
+                ParagraphStyle('hr', fontSize=9.5, textColor=WHITE,
+                               fontName='Helvetica', leading=14, alignment=TA_RIGHT)
+            ),
+        ]]
+        header_table = Table(header_data, colWidths=[10*cm, 7*cm])
+        header_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), BLUE),
+            ('VALIGN',     (0,0), (-1,-1), 'MIDDLE'),
+            ('PADDING',    (0,0), (-1,-1), 14),
+            ('TOPPADDING', (0,0), (-1,-1), 16),
+            ('BOTTOMPADDING',(0,0),(-1,-1), 16),
+        ]))
+        elems.append(header_table)
+
+        # ── BANDEAU TITRE ─────────────────────────────────────────────────────
+        elems.append(Table(
+            [[Paragraph('REÇU DE SCOLARITÉ', ParagraphStyle(
+                'rt', fontSize=13, textColor=WHITE, fontName='Helvetica-Bold',
+                alignment=TA_CENTER))]],
+            colWidths=[17*cm],
+            style=[('BACKGROUND',(0,0),(-1,-1), LBLUE),
+                   ('PADDING',(0,0),(-1,-1), 7)]
+        ))
+        elems.append(Spacer(1, 0.5*cm))
+
+        # ── INFORMATIONS ÉTUDIANT ─────────────────────────────────────────────
+        elems.append(Paragraph('INFORMATIONS ÉTUDIANT',
+            ParagraphStyle('sh', fontSize=9, textColor=BLUE,
+                           fontName='Helvetica-Bold', spaceBefore=0, spaceAfter=4)))
+
+        et_nom    = f'{etudiant.prenom} {etudiant.nom}'.upper() if etudiant else 'N/A'
+        et_mat    = etudiant.matricule if etudiant else 'N/A'
+        et_fil    = f'{etudiant.classe} - {etudiant.filiere}' if etudiant else 'N/A'
+        et_annee  = etudiant.annee_academique if etudiant else '-'
+
+        etu_data = [
+            ['Nom et Prénom',      et_nom,   'Matricule',       et_mat],
+            ['Filière / Classe',   et_fil,   'Année académique', et_annee],
         ]
-
-        table = Table(data, colWidths=[5*cm, 11*cm])
-        table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), BLUE),
-            ('TEXTCOLOR',  (0, 0), (-1, 0), colors.white),
-            ('FONTNAME',   (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE',   (0, 0), (-1, 0), 11),
-            ('SPAN',       (0, 0), (-1, 0)),
-            ('ALIGN',      (0, 0), (-1, 0), 'CENTER'),
-            ('BACKGROUND', (0, 5), (-1, 5), BLUE),
-            ('TEXTCOLOR',  (0, 5), (-1, 5), colors.white),
-            ('FONTNAME',   (0, 5), (-1, 5), 'Helvetica-Bold'),
-            ('SPAN',       (0, 5), (-1, 5)),
-            ('ALIGN',      (0, 5), (-1, 5), 'CENTER'),
-            ('BACKGROUND', (0, 4), (-1, 4), colors.white),
-            ('FONTNAME',   (0, 1), (0, -1), 'Helvetica-Bold'),
-            ('TEXTCOLOR',  (0, 1), (0, -1), BLUE),
-            ('FONTSIZE',   (0, 1), (-1, -1), 10),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [LIGHT, colors.white]),
-            ('GRID',       (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
-            ('PADDING',    (0, 0), (-1, -1), 8),
+        etu_table = Table(etu_data, colWidths=[3.5*cm, 5.5*cm, 3.5*cm, 4.5*cm])
+        etu_table.setStyle(TableStyle([
+            ('FONTNAME',  (0,0), (0,-1), 'Helvetica-Bold'),
+            ('FONTNAME',  (2,0), (2,-1), 'Helvetica-Bold'),
+            ('FONTSIZE',  (0,0), (-1,-1), 9),
+            ('TEXTCOLOR', (0,0), (0,-1), BLUE),
+            ('TEXTCOLOR', (2,0), (2,-1), BLUE),
+            ('BACKGROUND',(0,0), (0,-1), LGRAY),
+            ('BACKGROUND',(2,0), (2,-1), LGRAY),
+            ('GRID',      (0,0), (-1,-1), 0.5, BGRAY),
+            ('PADDING',   (0,0), (-1,-1), 7),
+            ('VALIGN',    (0,0), (-1,-1), 'MIDDLE'),
         ]))
-        elements.append(table)
-        elements.append(Spacer(1, 1*cm))
+        elems.append(etu_table)
+        elems.append(Spacer(1, 0.4*cm))
 
-        # Signature
-        elements.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#E2E8F0')))
-        elements.append(Spacer(1, 0.3*cm))
-        sig_data = [['Signature du Caissier', 'Cachet de l\'établissement']]
-        sig_table = Table(sig_data, colWidths=[8*cm, 8*cm])
+        # ── OBJET DU PAIEMENT ─────────────────────────────────────────────────
+        motif = paiement.motif or 'Frais de scolarité'
+        elems.append(Table(
+            [[Paragraph(f'<b>OBJET :</b>  {motif}',
+                ParagraphStyle('obj', fontSize=10, textColor=BLUE, leading=14))]],
+            colWidths=[17*cm],
+            style=[('BACKGROUND',(0,0),(-1,-1), LGRAY),
+                   ('PADDING',(0,0),(-1,-1), 9),
+                   ('BOX',(0,0),(-1,-1), 0.5, BGRAY)]
+        ))
+        elems.append(Spacer(1, 0.5*cm))
+
+        # ── MONTANT ───────────────────────────────────────────────────────────
+        elems.append(Paragraph('MONTANT REÇU',
+            ParagraphStyle('sh2', fontSize=9, textColor=BLUE,
+                           fontName='Helvetica-Bold', spaceAfter=4)))
+        montant_data = [
+            [Paragraph(f'<font size="26"><b>{montant_fmt}</b></font>',
+                ParagraphStyle('mf', fontSize=26, textColor=GREEN,
+                               fontName='Helvetica-Bold', alignment=TA_CENTER))],
+            [Paragraph(f'<i>En lettres : {montant_lettres}</i>',
+                ParagraphStyle('ml', fontSize=9, textColor=GRAY, alignment=TA_CENTER))],
+        ]
+        mt_table = Table(montant_data, colWidths=[17*cm])
+        mt_table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0FDF4')),
+            ('BOX',        (0,0), (-1,-1), 1.5, GREEN),
+            ('PADDING',    (0,0), (-1,-1), 12),
+            ('TOPPADDING', (0,0), (0,0),   14),
+        ]))
+        elems.append(mt_table)
+        elems.append(Spacer(1, 0.5*cm))
+
+        # ── DÉTAILS DU PAIEMENT ───────────────────────────────────────────────
+        elems.append(Paragraph('DÉTAILS DU PAIEMENT',
+            ParagraphStyle('sh3', fontSize=9, textColor=BLUE,
+                           fontName='Helvetica-Bold', spaceAfter=4)))
+        ref = paiement.reference or '-'
+        det_data = [
+            ['Mode de paiement', mode_label, 'Référence', ref],
+            ['Caisse',           caisse.nom if caisse else '-',
+             'Enregistré par',   'FinTrack / Comptabilité'],
+        ]
+        det_table = Table(det_data, colWidths=[3.5*cm, 5.5*cm, 3.5*cm, 4.5*cm])
+        det_table.setStyle(TableStyle([
+            ('FONTNAME',  (0,0), (0,-1), 'Helvetica-Bold'),
+            ('FONTNAME',  (2,0), (2,-1), 'Helvetica-Bold'),
+            ('FONTSIZE',  (0,0), (-1,-1), 9),
+            ('TEXTCOLOR', (0,0), (0,-1), BLUE),
+            ('TEXTCOLOR', (2,0), (2,-1), BLUE),
+            ('BACKGROUND',(0,0), (0,-1), LGRAY),
+            ('BACKGROUND',(2,0), (2,-1), LGRAY),
+            ('GRID',      (0,0), (-1,-1), 0.5, BGRAY),
+            ('PADDING',   (0,0), (-1,-1), 7),
+            ('VALIGN',    (0,0), (-1,-1), 'MIDDLE'),
+        ]))
+        elems.append(det_table)
+        elems.append(Spacer(1, 0.8*cm))
+
+        # ── SIGNATURES ────────────────────────────────────────────────────────
+        sig_data = [[
+            Paragraph(
+                '<b>Le Caissier / Comptable</b><br/><br/><br/><br/>Signature :',
+                ParagraphStyle('sc', fontSize=9, fontName='Helvetica', textColor=BLUE, alignment=TA_CENTER, leading=14)
+            ),
+            Paragraph(
+                '<b>Cachet et Signature RAF</b><br/><br/><br/><br/>Signature :',
+                ParagraphStyle('sc2', fontSize=9, fontName='Helvetica', textColor=BLUE, alignment=TA_CENTER, leading=14)
+            ),
+            Paragraph(
+                '<b><font color="#16A34A">BON POUR ACQUIT</font></b><br/><br/><br/><br/>'
+                '<font color="#16A34A">Lu et approuvé</font>',
+                ParagraphStyle('bpa', fontSize=9, fontName='Helvetica', alignment=TA_CENTER, leading=14)
+            ),
+        ]]
+        sig_table = Table(sig_data, colWidths=[6*cm, 5.5*cm, 5.5*cm], rowHeights=[3.5*cm])
         sig_table.setStyle(TableStyle([
-            ('FONTNAME',  (0,0), (-1,-1), 'Helvetica-Bold'),
-            ('TEXTCOLOR', (0,0), (-1,-1), GRAY),
-            ('FONTSIZE',  (0,0), (-1,-1), 10),
-            ('ALIGN',     (0,0), (-1,-1), 'CENTER'),
+            ('BOX',        (0,0), (0,0), 0.5, BGRAY),
+            ('BOX',        (1,0), (1,0), 0.5, BGRAY),
+            ('BOX',        (2,0), (2,0), 1.5, GREEN),
+            ('BACKGROUND', (2,0), (2,0), colors.HexColor('#F0FDF4')),
+            ('PADDING',    (0,0), (-1,-1), 10),
+            ('VALIGN',     (0,0), (-1,-1), 'TOP'),
+            ('ALIGN',      (0,0), (-1,-1), 'CENTER'),
         ]))
-        elements.append(sig_table)
-        elements.append(Spacer(1, 2*cm))
+        elems.append(sig_table)
+        elems.append(Spacer(1, 0.6*cm))
 
-        # Footer
-        elements.append(HRFlowable(width='100%', thickness=1, color=BLUE))
-        elements.append(Paragraph('Ce reçu est généré automatiquement par FinTrack — ISM Dakar',
-            ParagraphStyle('footer', fontSize=9, textColor=GRAY, alignment=TA_CENTER)))
+        # ── PIED DE PAGE ──────────────────────────────────────────────────────
+        elems.append(HRFlowable(width='100%', thickness=1, color=BLUE))
+        elems.append(Spacer(1, 0.15*cm))
+        elems.append(Paragraph(
+            f'Document officiel - FinTrack | ISM Dakar Ecole d\'Ingenieurs et Digital Campus  |  '
+            f'Réf. {num_recu}  |  {date_str}',
+            ParagraphStyle('ft', fontSize=7.5, textColor=GRAY, alignment=TA_CENTER)
+        ))
+        elems.append(Paragraph(
+            'Ce reçu fait foi de paiement. Conservez-le précieusement. Toute réclamation doit être présentée '
+            'dans un délai de 30 jours à la Direction Administrative et Financière.',
+            ParagraphStyle('ft2', fontSize=7, textColor=GRAY, alignment=TA_CENTER)
+        ))
 
-        doc.build(elements)
+        doc.build(elems)
         buffer.seek(0)
 
         return send_file(
             buffer,
             mimetype='application/pdf',
             as_attachment=False,
-            download_name=f'recu_FT{paiement.id_paiement:05d}.pdf'
+            download_name=f'recu_{num_recu}.pdf'
         )
 
     except ImportError:

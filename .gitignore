@@ -1,23 +1,58 @@
-# Python
-backend/venv/
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-backend/.env
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
 
-# Node
+# ── Variables d'environnement (SENSIBLE) ────────────────
+.env
+.env.local
+.env.production
+*.env
+
+# ── Node.js ──────────────────────────────────────────────
 node_modules/
 frontend/node_modules/
-frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# OS
+# ── Build React ──────────────────────────────────────────
+frontend/dist/
+frontend/build/
+
+# ── Base de données locale ───────────────────────────────
+*.sqlite
+*.db
+
+# ── IDE ──────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ───────────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# IDE
-.vscode/
-.idea/
+# ── Docker ───────────────────────────────────────────────
+.dockerignore
 
-backend/instance/*.db
-backend/instance/*.db-shm
-backend/instance/*.db-wal
+# ── Tests ────────────────────────────────────────────────
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ── Logs ────────────────────────────────────────────────
+*.log
+logs/

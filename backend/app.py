@@ -25,9 +25,14 @@ from routes.audit import audit_bp
 def create_app():
     app = Flask(__name__)
 
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "https://fintrack-frontend-h7vv.onrender.com",
+    ]
     CORS(app, resources={
         r"/api/*": {
-            "origins": ["http://localhost:5173"],
+            "origins": allowed_origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"]
         }

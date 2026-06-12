@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import { useIsMobile } from '../hooks/useIsMobile'
 
@@ -42,7 +42,7 @@ export default function Login() {
     <div style={{
       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: '#fff', padding: isMobile ? '32px 24px' : '48px 40px',
-      minHeight: isMobile ? '100vh' : 'auto',
+      minHeight: isMobile ? '100dvh' : 'auto',
     }}>
       <div style={{ width: '100%', maxWidth: '420px' }}>
 
@@ -130,8 +130,18 @@ export default function Login() {
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '12px', marginTop: '32px' }}>
-          FinTrack © 2026 — ISM École d'Ingénieur
+        <div style={{ textAlign: 'center', marginTop: '28px' }}>
+          <Link to="/suivi-paiements" style={{
+            display: 'inline-block', padding: '9px 18px',
+            background: '#F1F5F9', color: '#1B3A6B', borderRadius: '8px',
+            fontSize: '13px', fontWeight: '600', textDecoration: 'none',
+            border: '1px solid #E2E8F0',
+          }}>
+            🎓 Consulter mes paiements (Portail Étudiant)
+          </Link>
+        </div>
+        <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '12px', marginTop: '20px' }}>
+          FinTrack © 2026 — ISM Dakar École d'Ingénieurs et Digital Campus
         </p>
       </div>
     </div>
@@ -142,7 +152,7 @@ export default function Login() {
 
   // Desktop: two-column layout
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'Inter, sans-serif' }}>
+    <div style={{ display: 'flex', height: '100dvh', fontFamily: 'Inter, sans-serif' }}>
 
       {/* Left panel */}
       <div style={{
