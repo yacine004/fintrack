@@ -22,8 +22,11 @@ RUN pip install --no-cache-dir gunicorn
 # Copie du code source
 COPY . .
 
+# Rendre le script de démarrage exécutable
+RUN chmod +x entrypoint.sh
+
 # Exposition du port
 EXPOSE 5000
 
 # Commande de démarrage
-CMD ["gunicorn", "wsgi:app", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "120"]
+CMD ["./entrypoint.sh"]
