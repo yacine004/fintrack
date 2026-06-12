@@ -38,8 +38,8 @@ pipeline {
         stage('Déploiement') {
             steps {
                 echo '🚀 Déploiement de FinTrack...'
-                sh 'docker-compose down --remove-orphans || true'
-                sh 'docker-compose up -d'
+                sh 'docker-compose -p fintrack down --remove-orphans || true'
+                sh 'docker-compose -p fintrack up -d'
                 sh 'sleep 10'
                 sh 'docker ps'
             }
