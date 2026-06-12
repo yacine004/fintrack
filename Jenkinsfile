@@ -21,9 +21,9 @@ pipeline {
             steps {
                 echo '🧪 Exécution des tests Pytest...'
                 dir('backend') {
-                    sh 'pip install -r requirements.txt --quiet'
-                    sh 'pip install pytest pytest-flask --quiet'
-                    sh 'pytest tests/ -v --tb=short || true'
+                    sh 'python3 -m pip install -r requirements.txt --quiet'
+                    sh 'python3 -m pip install pytest pytest-flask --quiet'
+                    sh 'python3 -m pytest tests/ -v --tb=short || true'
                 }
             }
         }
