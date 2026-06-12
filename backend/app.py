@@ -3,8 +3,10 @@ from flask_cors import CORS
 from datetime import timedelta
 from dotenv import load_dotenv
 import os
+from prometheus_flask_exporter import PrometheusMetrics
 
 load_dotenv()
+metrics = PrometheusMetrics(app=None)
 
 from extensions import db, bcrypt, jwt
 from routes.auth import auth_bp
@@ -24,6 +26,7 @@ from routes.audit import audit_bp
 
 def create_app():
     app = Flask(__name__)
+    metrics = PrometheusMetrics(app)
 
     allowed_origins = [
         "http://localhost:5173",

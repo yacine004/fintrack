@@ -6,3 +6,4 @@ flask-cors
 psycopg2-binary
 python-dotenv
 gunicorn
+prometheus-flask-exporter
