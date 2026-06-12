@@ -11,7 +11,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo '📥 Récupération du code source depuis GitHub...'
-                git branch: 'main',
+                git branch: 'develop',
                     credentialsId: 'github-token',
                     url: "${GITHUB_REPO}"
             }
