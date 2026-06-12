@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  # ── Base de données PostgreSQL ──────────────────────────
+  db:
+    image: postgres:15
+    container_name: fintrack_db
+    restart: always
+    environment:
+      POSTGRES_DB: fintrack_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: etudiante
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fintrack_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend Flask + Gunicorn ────────────────────────────
+  backend:
+    build: ./backend
+    container_name: fintrack_backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://postgres:etudiante@db/fintrack_db
+      JWT_SECRET_KEY: fintrack-secret-2026
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - fintrack_network
+
+  # ── Frontend React + Nginx ──────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: fintrack_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - fintrack_network
+
+volumes:
+  postgres_data:
+
+networks:
+  fintrack_network:
+    driver: bridge
