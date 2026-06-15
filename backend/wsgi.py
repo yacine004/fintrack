@@ -24,11 +24,11 @@ with app.app_context():
     db.session.commit()
 
     c1 = Caisse(nom='Caisse Principale', type_caisse='principale',
-        description='Caisse principale ISM', solde_actuel=5000000.00, statut='actif')
+        solde_actuel=5000000.00, statut='actif')
     c2 = Caisse(nom='Caisse Scolarite', type_caisse='secondaire',
-        description='Frais de scolarite', solde_actuel=2500000.00, statut='actif')
+        solde_actuel=2500000.00, statut='actif')
     c3 = Caisse(nom='Caisse Projets', type_caisse='projet',
-        description='Projets etudiants', solde_actuel=750000.00, statut='actif')
+        solde_actuel=750000.00, statut='actif')
     db.session.add_all([c1, c2, c3])
     db.session.flush()
     db.session.commit()
@@ -65,57 +65,66 @@ with app.app_context():
     db.session.commit()
 
     db.session.add_all([
-        Paiement(id_etudiant=e1.id, id_caisse=c1.id, montant=250000,
-            mode_paiement='especes', type_frais='scolarite',
-            enregistre_par=comptable.id, date_paiement=datetime(2026,1,15)),
-        Paiement(id_etudiant=e2.id, id_caisse=c2.id, montant=300000,
-            mode_paiement='wave', type_frais='scolarite',
-            enregistre_par=comptable.id, date_paiement=datetime(2026,2,10)),
-        Paiement(id_etudiant=e3.id, id_caisse=c1.id, montant=150000,
-            mode_paiement='orange_money', type_frais='inscription',
-            enregistre_par=comptable.id, date_paiement=datetime(2026,3,5)),
-        Paiement(id_etudiant=e4.id, id_caisse=c2.id, montant=200000,
-            mode_paiement='especes', type_frais='scolarite',
-            enregistre_par=comptable.id, date_paiement=datetime(2026,4,20)),
-        Paiement(id_etudiant=e5.id, id_caisse=c1.id, montant=350000,
-            mode_paiement='virement', type_frais='scolarite',
-            enregistre_par=comptable.id, date_paiement=datetime(2026,5,8)),
-        Paiement(id_etudiant=e6.id, id_caisse=c2.id, montant=180000,
-            mode_paiement='wave', type_frais='soutenance',
-            enregistre_par=comptable.id, date_paiement=datetime(2026,6,1)),
+        Paiement(id_etudiant=e1.id_etudiant, id_caisse=c1.id_caisse,
+            montant=250000, mode_paiement='especes', type_frais='scolarite',
+            enregistre_par=raf.id_utilisateur,
+            date_paiement=datetime(2026,1,15)),
+        Paiement(id_etudiant=e2.id_etudiant, id_caisse=c2.id_caisse,
+            montant=300000, mode_paiement='wave', type_frais='scolarite',
+            enregistre_par=comptable.id_utilisateur,
+            date_paiement=datetime(2026,2,10)),
+        Paiement(id_etudiant=e3.id_etudiant, id_caisse=c1.id_caisse,
+            montant=150000, mode_paiement='orange_money', type_frais='inscription',
+            enregistre_par=comptable.id_utilisateur,
+            date_paiement=datetime(2026,3,5)),
+        Paiement(id_etudiant=e4.id_etudiant, id_caisse=c2.id_caisse,
+            montant=200000, mode_paiement='especes', type_frais='scolarite',
+            enregistre_par=comptable.id_utilisateur,
+            date_paiement=datetime(2026,4,20)),
+        Paiement(id_etudiant=e5.id_etudiant, id_caisse=c1.id_caisse,
+            montant=350000, mode_paiement='virement', type_frais='scolarite',
+            enregistre_par=comptable.id_utilisateur,
+            date_paiement=datetime(2026,5,8)),
+        Paiement(id_etudiant=e6.id_etudiant, id_caisse=c2.id_caisse,
+            montant=180000, mode_paiement='wave', type_frais='soutenance',
+            enregistre_par=comptable.id_utilisateur,
+            date_paiement=datetime(2026,6,1)),
     ])
     db.session.commit()
 
     db.session.add_all([
-        Depense(id_caisse=c1.id, libelle='Achat fournitures bureau',
+        Depense(id_caisse=c1.id_caisse, libelle='Achat fournitures bureau',
             montant=85000, categorie='Fournitures', statut='validee',
-            enregistre_par=comptable.id, valide_par=raf.id,
+            enregistre_par=comptable.id_utilisateur,
+            valide_par=raf.id_utilisateur,
             date_depense=datetime(2026,1,20)),
-        Depense(id_caisse=c1.id, libelle='Maintenance climatiseurs',
+        Depense(id_caisse=c1.id_caisse, libelle='Maintenance climatiseurs',
             montant=120000, categorie='Maintenance', statut='validee',
-            enregistre_par=comptable.id, valide_par=raf.id,
+            enregistre_par=comptable.id_utilisateur,
+            valide_par=raf.id_utilisateur,
             date_depense=datetime(2026,2,15)),
-        Depense(id_caisse=c3.id, libelle='Achat ordinateurs portables',
+        Depense(id_caisse=c3.id_caisse, libelle='Achat ordinateurs portables',
             montant=650000, categorie='Informatique', statut='en_attente',
-            enregistre_par=comptable.id,
+            enregistre_par=comptable.id_utilisateur,
             date_depense=datetime(2026,3,10)),
-        Depense(id_caisse=c1.id, libelle='Journee portes ouvertes',
+        Depense(id_caisse=c1.id_caisse, libelle='Journee portes ouvertes',
             montant=180000, categorie='Evenements', statut='validee',
-            enregistre_par=comptable.id, valide_par=raf.id,
+            enregistre_par=comptable.id_utilisateur,
+            valide_par=raf.id_utilisateur,
             date_depense=datetime(2026,4,5)),
     ])
     db.session.commit()
 
     db.session.add_all([
-        Notification(id_utilisateur=raf.id,
+        Notification(id_utilisateur=raf.id_utilisateur,
             titre='Depassement budget Informatique',
             message='Budget Informatique consomme a 81%.',
             type_notif='alerte_budget', priorite='haute', lue=False),
-        Notification(id_utilisateur=raf.id,
+        Notification(id_utilisateur=raf.id_utilisateur,
             titre='Nouveau paiement enregistre',
             message='Paiement 350000 FCFA pour Kone Ibrahim.',
             type_notif='paiement', priorite='normale', lue=False),
-        Notification(id_utilisateur=comptable.id,
+        Notification(id_utilisateur=comptable.id_utilisateur,
             titre='Depense en attente',
             message='Achat ordinateurs portables attend validation.',
             type_notif='depense', priorite='normale', lue=False),
@@ -123,11 +132,13 @@ with app.app_context():
     db.session.commit()
 
     db.session.add_all([
-        Message(id_expediteur=raf.id, id_destinataire=comptable.id,
+        Message(id_expediteur=raf.id_utilisateur,
+            id_destinataire=comptable.id_utilisateur,
             objet='Validation depense urgente',
             contenu='Merci de valider la depense informatique avant vendredi.',
             lu=False, date_envoi=datetime(2026,6,10)),
-        Message(id_expediteur=comptable.id, id_destinataire=raf.id,
+        Message(id_expediteur=comptable.id_utilisateur,
+            id_destinataire=raf.id_utilisateur,
             objet='Rapport mensuel Mai 2026',
             contenu='Rapport Mai pret. Total encaisse 1430000 FCFA.',
             lu=True, date_envoi=datetime(2026,6,5)),
@@ -135,14 +146,17 @@ with app.app_context():
     db.session.commit()
 
     db.session.add_all([
-        AuditLog(id_utilisateur=raf.id, action='CREATE',
-            table_cible='utilisateur', description='Creation compte comptable',
+        AuditLog(id_utilisateur=raf.id_utilisateur, action='CREATE',
+            table_cible='utilisateur',
+            description='Creation compte comptable',
             date_action=datetime(2026,1,1)),
-        AuditLog(id_utilisateur=comptable.id, action='CREATE',
-            table_cible='paiement', description='Paiement Diallo 250000 FCFA',
+        AuditLog(id_utilisateur=comptable.id_utilisateur, action='CREATE',
+            table_cible='paiement',
+            description='Paiement Diallo 250000 FCFA',
             date_action=datetime(2026,1,15)),
-        AuditLog(id_utilisateur=raf.id, action='VALIDATE',
-            table_cible='depense', description='Validation depense fournitures',
+        AuditLog(id_utilisateur=raf.id_utilisateur, action='VALIDATE',
+            table_cible='depense',
+            description='Validation depense fournitures',
             date_action=datetime(2026,1,22)),
     ])
     db.session.commit()
