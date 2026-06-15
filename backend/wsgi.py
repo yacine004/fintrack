@@ -53,11 +53,11 @@ with app.app_context():
     db.session.commit()
 
     db.session.add_all([
-        Budget(categorie='Fournitures', montant_alloue=500000, annee='2026', description='Fournitures de bureau'),
-        Budget(categorie='Salaires', montant_alloue=2000000, annee='2026', description='Salaires du personnel'),
-        Budget(categorie='Maintenance', montant_alloue=300000, annee='2026', description='Maintenance equipements'),
-        Budget(categorie='Evenements', montant_alloue=400000, annee='2026', description='Evenements et ceremonies'),
-        Budget(categorie='Informatique', montant_alloue=800000, annee='2026', description='Materiel informatique'),
+        Budget(categorie='Fournitures', montant_alloue=500000, annee='2026'),
+        Budget(categorie='Salaires', montant_alloue=2000000, annee='2026'),
+        Budget(categorie='Maintenance', montant_alloue=300000, annee='2026'),
+        Budget(categorie='Evenements', montant_alloue=400000, annee='2026'),
+        Budget(categorie='Informatique', montant_alloue=800000, annee='2026'),
     ])
     db.session.commit()
 
