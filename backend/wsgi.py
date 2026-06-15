@@ -2,6 +2,7 @@
 from app import create_app
 from extensions import db, bcrypt
 from datetime import datetime
+from models import (Utilisateur, Etudiant, Caisse, Paiement, Depense, Budget, Notification, Message, AuditLog)
 
 app = create_app()
 
@@ -56,6 +57,20 @@ with app.app_context():
         classe='L2', filiere='GLRS', annee_academique='2025-2026', statut='actif')
     db.session.add_all([e1, e2, e3, e4, e5, e6])
     db.session.flush()
+    db.session.commit()
+
+    db.session.add_all([
+        Budget(categorie='Fournitures', montant_alloue=500000,
+            montant_consomme=85000, annee='2026'),
+        Budget(categorie='Salaires', montant_alloue=2000000,
+            montant_consomme=0, annee='2026'),
+        Budget(categorie='Maintenance', montant_alloue=300000,
+            montant_consomme=120000, annee='2026'),
+        Budget(categorie='Evenements', montant_alloue=400000,
+            montant_consomme=180000, annee='2026'),
+        Budget(categorie='Informatique', montant_alloue=800000,
+            montant_consomme=650000, annee='2026'),
+    ])
     db.session.commit()
 
     db.session.add_all([
