@@ -24,11 +24,14 @@ with app.app_context():
     db.session.commit()
 
     c1 = Caisse(nom='Caisse Principale', type_caisse='principale',
-        solde_actuel=5000000.00, statut='actif')
+        description='Caisse principale ISM',
+        solde_actuel=5000000.00, statut='active')
     c2 = Caisse(nom='Caisse Scolarite', type_caisse='secondaire',
-        solde_actuel=2500000.00, statut='actif')
+        description='Frais de scolarite',
+        solde_actuel=2500000.00, statut='active')
     c3 = Caisse(nom='Caisse Projets', type_caisse='projet',
-        solde_actuel=750000.00, statut='actif')
+        description='Projets etudiants',
+        solde_actuel=750000.00, statut='active')
     db.session.add_all([c1, c2, c3])
     db.session.flush()
     db.session.commit()
@@ -58,22 +61,28 @@ with app.app_context():
     db.session.add_all([
         Paiement(id_etudiant=e1.id_etudiant, id_caisse=c1.id_caisse,
             montant=250000, mode_paiement='especes',
-            motif='Frais scolarite S1', date_paiement=datetime(2026,1,15)),
+            motif='Frais scolarite S1',
+            date_paiement=datetime(2026,1,15)),
         Paiement(id_etudiant=e2.id_etudiant, id_caisse=c2.id_caisse,
             montant=300000, mode_paiement='wave',
-            motif='Frais scolarite S1', date_paiement=datetime(2026,2,10)),
+            motif='Frais scolarite S1',
+            date_paiement=datetime(2026,2,10)),
         Paiement(id_etudiant=e3.id_etudiant, id_caisse=c1.id_caisse,
             montant=150000, mode_paiement='orange_money',
-            motif='Frais inscription', date_paiement=datetime(2026,3,5)),
+            motif='Frais inscription',
+            date_paiement=datetime(2026,3,5)),
         Paiement(id_etudiant=e4.id_etudiant, id_caisse=c2.id_caisse,
             montant=200000, mode_paiement='especes',
-            motif='Frais scolarite S2', date_paiement=datetime(2026,4,20)),
+            motif='Frais scolarite S2',
+            date_paiement=datetime(2026,4,20)),
         Paiement(id_etudiant=e5.id_etudiant, id_caisse=c1.id_caisse,
             montant=350000, mode_paiement='virement',
-            motif='Frais scolarite annuel', date_paiement=datetime(2026,5,8)),
+            motif='Frais scolarite annuel',
+            date_paiement=datetime(2026,5,8)),
         Paiement(id_etudiant=e6.id_etudiant, id_caisse=c2.id_caisse,
             montant=180000, mode_paiement='wave',
-            motif='Frais soutenance', date_paiement=datetime(2026,6,1)),
+            motif='Frais soutenance',
+            date_paiement=datetime(2026,6,1)),
     ])
     db.session.commit()
 
@@ -101,15 +110,15 @@ with app.app_context():
         Notification(id_utilisateur=raf.id_utilisateur,
             type='alerte_budget',
             message='Budget Informatique consomme a 81%.',
-            priorite='haute', lue=False),
+            priorite='haute', lu=False),
         Notification(id_utilisateur=raf.id_utilisateur,
             type='paiement',
             message='Paiement 350000 FCFA pour Kone Ibrahim.',
-            priorite='normale', lue=False),
+            priorite='normale', lu=False),
         Notification(id_utilisateur=comptable.id_utilisateur,
             type='depense',
             message='Achat ordinateurs portables attend validation.',
-            priorite='normale', lue=False),
+            priorite='normale', lu=False),
     ])
     db.session.commit()
 
