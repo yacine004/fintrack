@@ -20,6 +20,7 @@ with app.app_context():
         mot_de_passe_hash=bcrypt.generate_password_hash('comptable123').decode(),
         role='comptable', actif=True, contact='77 100 00 02')
     db.session.add_all([raf, comptable])
+    db.session.flush()
     db.session.commit()
 
     c1 = Caisse(nom='Caisse Principale', type_caisse='principale',
@@ -29,6 +30,7 @@ with app.app_context():
     c3 = Caisse(nom='Caisse Projets', type_caisse='projet',
         description='Projets etudiants', solde_actuel=750000.00, statut='actif')
     db.session.add_all([c1, c2, c3])
+    db.session.flush()
     db.session.commit()
 
     e1 = Etudiant(matricule='ISM2026001', nom='Diallo', prenom='Mamadou',
@@ -50,6 +52,7 @@ with app.app_context():
         email='m.fall@ism.edu.sn', contact='77 666 66 66',
         classe='L2', filiere='GLRS', annee_academique='2025-2026', statut='actif')
     db.session.add_all([e1, e2, e3, e4, e5, e6])
+    db.session.flush()
     db.session.commit()
 
     db.session.add_all([
@@ -94,7 +97,8 @@ with app.app_context():
             date_depense=datetime(2026,2,15)),
         Depense(id_caisse=c3.id, libelle='Achat ordinateurs portables',
             montant=650000, categorie='Informatique', statut='en_attente',
-            enregistre_par=comptable.id, date_depense=datetime(2026,3,10)),
+            enregistre_par=comptable.id,
+            date_depense=datetime(2026,3,10)),
         Depense(id_caisse=c1.id, libelle='Journee portes ouvertes',
             montant=180000, categorie='Evenements', statut='validee',
             enregistre_par=comptable.id, valide_par=raf.id,
