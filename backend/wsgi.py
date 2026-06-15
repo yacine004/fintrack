@@ -6,7 +6,7 @@ from datetime import datetime
 
 app = create_app()
 
-with app.app_context():
+def seed():
     db.drop_all()
     db.create_all()
     print("OK Tables reinitialisees")
@@ -78,3 +78,119 @@ with app.app_context():
                annee='2026', description='Salaires du personnel'),
         Budget(categorie='Maintenance', montant_alloue=300000,
                annee='2026', description='Maintenance des equipements'),
+        Budget(categorie='Evenements', montant_alloue=400000,
+               annee='2026', description='Evenements et ceremonies'),
+        Budget(categorie='Informatique', montant_alloue=800000,
+               annee='2026', description='Materiel informatique'),
+    ]
+    db.session.add_all(budgets)
+    db.session.commit()
+    print("OK Budgets crees")
+
+    paiements = [
+        Paiement(id_etudiant=e1.id, id_caisse=c1.id, montant=250000,
+                 mode_paiement='especes', type_frais='scolarite',
+                 enregistre_par=comptable.id,
+                 date_paiement=datetime(2026, 1, 15)),
+        Paiement(id_etudiant=e2.id, id_caisse=c2.id, montant=300000,
+                 mode_paiement='wave', type_frais='scolarite',
+                 enregistre_par=comptable.id,
+                 date_paiement=datetime(2026, 2, 10)),
+        Paiement(id_etudiant=e3.id, id_caisse=c1.id, montant=150000,
+                 mode_paiement='orange_money', type_frais='inscription',
+                 enregistre_par=comptable.id,
+                 date_paiement=datetime(2026, 3, 5)),
+        Paiement(id_etudiant=e4.id, id_caisse=c2.id, montant=200000,
+                 mode_paiement='especes', type_frais='scolarite',
+                 enregistre_par=comptable.id,
+                 date_paiement=datetime(2026, 4, 20)),
+        Paiement(id_etudiant=e5.id, id_caisse=c1.id, montant=350000,
+                 mode_paiement='virement', type_frais='scolarite',
+                 enregistre_par=comptable.id,
+                 date_paiement=datetime(2026, 5, 8)),
+        Paiement(id_etudiant=e6.id, id_caisse=c2.id, montant=180000,
+                 mode_paiement='wave', type_frais='soutenance',
+                 enregistre_par=comptable.id,
+                 date_paiement=datetime(2026, 6, 1)),
+    ]
+    db.session.add_all(paiements)
+    db.session.commit()
+    print("OK Paiements crees")
+
+    depenses = [
+        Depense(id_caisse=c1.id, libelle='Achat fournitures bureau',
+                montant=85000, categorie='Fournitures', statut='validee',
+                enregistre_par=comptable.id, valide_par=raf.id,
+                date_depense=datetime(2026, 1, 20)),
+        Depense(id_caisse=c1.id, libelle='Maintenance climatiseurs',
+                montant=120000, categorie='Maintenance', statut='validee',
+                enregistre_par=comptable.id, valide_par=raf.id,
+                date_depense=datetime(2026, 2, 15)),
+        Depense(id_caisse=c3.id, libelle='Achat ordinateurs portables',
+                montant=650000, categorie='Informatique', statut='en_attente',
+                enregistre_par=comptable.id,
+                date_depense=datetime(2026, 3, 10)),
+        Depense(id_caisse=c1.id, libelle='Journee portes ouvertes',
+                montant=180000, categorie='Evenements', statut='validee',
+                enregistre_par=comptable.id, valide_par=raf.id,
+                date_depense=datetime(2026, 4, 5)),
+    ]
+    db.session.add_all(depenses)
+    db.session.commit()
+    print("OK Depenses creees")
+
+    notifs = [
+        Notification(id_utilisateur=raf.id,
+                     titre='Depassement budget Informatique',
+                     message='Le budget Informatique est consomme a 81%.',
+                     type_notif='alerte_budget', priorite='haute', lue=False),
+        Notification(id_utilisateur=raf.id,
+                     titre='Nouveau paiement enregistre',
+                     message='Paiement de 350 000 FCFA pour Kone Ibrahim.',
+                     type_notif='paiement', priorite='normale', lue=False),
+        Notification(id_utilisateur=comptable.id,
+                     titre='Depense en attente de validation',
+                     message='Achat ordinateurs portables attend validation.',
+                     type_notif='depense', priorite='normale', lue=False),
+    ]
+    db.session.add_all(notifs)
+    db.session.commit()
+    print("OK Notifications creees")
+
+    msgs = [
+        Message(id_expediteur=raf.id, id_destinataire=comptable.id,
+                objet='Validation depense urgente',
+                contenu='Merci de valider la depense informatique avant vendredi.',
+                lu=False, date_envoi=datetime(2026, 6, 10)),
+        Message(id_expediteur=comptable.id, id_destinataire=raf.id,
+                objet='Rapport mensuel Mai 2026',
+                contenu='Rapport Mai pret. Total encaisse : 1 430 000 FCFA.',
+                lu=True, date_envoi=datetime(2026, 6, 5)),
+    ]
+    db.session.add_all(msgs)
+    db.session.commit()
+    print("OK Messages crees")
+
+    audit_logs = [
+        AuditLog(id_utilisateur=raf.id, action='CREATE',
+                 table_cible='utilisateur',
+                 description='Creation compte comptable',
+                 date_action=datetime(2026, 1, 1)),
+        AuditLog(id_utilisateur=comptable.id, action='CREATE',
+                 table_cible='paiement',
+                 description='Paiement Diallo Mamadou 250000 FCFA',
+                 date_action=datetime(2026, 1, 15)),
+        AuditLog(id_utilisateur=raf.id, action='VALIDATE',
+                 table_cible='depense',
+                 description='Validation depense fournitures 85000 FCFA',
+                 date_action=datetime(2026, 1, 22)),
+    ]
+    db.session.add_all(audit_logs)
+    db.session.commit()
+    print("OK AuditLog cree")
+    print("OK SEED COMPLET")
+
+
+# Execution du seed au demarrage
+with app.app_context():
+    seed()
