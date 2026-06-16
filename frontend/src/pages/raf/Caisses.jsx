@@ -45,8 +45,10 @@ function ModalCaisse({ caisse, onClose, onSave }) {
     width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
     borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box'
   }
-  const labelStyle = { display: 'block', fontSize: '12px', fontWeight: '600',
-    color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }
+  const labelStyle = {
+    display: 'block', fontSize: '12px', fontWeight: '600',
+    color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px'
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
@@ -113,110 +115,133 @@ function ModalCaisse({ caisse, onClose, onSave }) {
   )
 }
 
-// ── Modal Transactions ────────────────────────────────────────────────────
-function ModalTransactions({ caisse, onClose }) {
+// ── Liste Transactions inline ─────────────────────────────────────────────
+function TransactionsList({ caisse }) {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage]       = useState(1)
 
   useEffect(() => {
-    const fetch_ = async () => {
+    setPage(1)
+  }, [caisse.id])
+
+  useEffect(() => {
+    const fetchTx = async () => {
       setLoading(true)
       try {
         const res  = await fetch(`${API}/caisses/${caisse.id}/transactions?page=${page}&limit=10`, { headers: getHeaders() })
         const json = await res.json()
         if (res.ok) setData(json)
-      } catch {}
+      } catch { /* empty */ }
       finally { setLoading(false) }
     }
-    fetch_()
+    fetchTx()
   }, [caisse.id, page])
 
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '32px',
-        width: '640px', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', color: '#1B3A6B', fontWeight: '700' }}>
-            📋 Transactions — {caisse.nom}
-          </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>✕</button>
-        </div>
+  const typeInfo = TYPE_COLORS[caisse.type_caisse] || TYPE_COLORS.secondaire
 
-        <div style={{ background: '#F0FDF4', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px' }}>
-          <span style={{ fontSize: '13px', color: '#64748B' }}>Solde actuel : </span>
-          <span style={{ fontSize: '20px', fontWeight: '800', color: '#16A34A' }}>
-            {caisse.solde_actuel.toLocaleString('fr-FR')} FCFA
+  return (
+    <div style={{ background: '#fff', borderRadius: '14px', padding: '24px 28px',
+      boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #F1F5F9',
+      borderTop: `3px solid ${typeInfo.color}`, marginTop: '24px' }}>
+
+      {/* En-tête */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1B3A6B' }}>
+            📋 Transactions — {caisse.nom}
+          </h3>
+          <span style={{ fontSize: '12px', color: '#94A3B8' }}>
+            {data?.total ?? '—'} transaction{(data?.total ?? 0) > 1 ? 's' : ''}
           </span>
         </div>
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8' }}>⏳ Chargement...</div>
-        ) : data?.transactions?.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '30px', color: '#94A3B8' }}>Aucune transaction</div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#F8FAFC' }}>
-                {['Type', 'Motif', 'Montant (FCFA)', 'Date'].map(h => (
-                  <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px',
-                    fontWeight: '700', color: '#64748B', textTransform: 'uppercase',
-                    borderBottom: '1px solid #E2E8F0' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {data?.transactions?.map((t, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                  <td style={{ padding: '10px 12px' }}>
-                    <span style={{
-                      background: t.type === 'entree' ? '#F0FDF4' : '#FEF2F2',
-                      color: t.type === 'entree' ? '#16A34A' : '#DC2626',
-                      padding: '3px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: '600'
-                    }}>
-                      {t.type === 'entree' ? '↑ Entrée' : '↓ Sortie'}
-                    </span>
-                  </td>
-                  <td style={{ padding: '10px 12px', fontSize: '13px', color: '#374151' }}>{t.motif}</td>
-                  <td style={{ padding: '10px 12px', fontSize: '13px', fontWeight: '700',
-                    color: t.type === 'entree' ? '#16A34A' : '#DC2626' }}>
-                    {t.type === 'entree' ? '+' : '-'} {Number(t.montant).toLocaleString('fr-FR')}
-                  </td>
-                  <td style={{ padding: '10px 12px', fontSize: '12px', color: '#94A3B8' }}>{t.date}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-
-        {data?.nb_pages > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-              style={{ padding: '6px 14px', border: '1.5px solid #E2E8F0', borderRadius: '6px',
-                background: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>← Préc.</button>
-            <span style={{ fontSize: '13px', color: '#64748B', alignSelf: 'center' }}>
-              {page} / {data.nb_pages}
-            </span>
-            <button onClick={() => setPage(p => Math.min(data.nb_pages, p + 1))} disabled={page === data.nb_pages}
-              style={{ padding: '6px 14px', border: '1.5px solid #E2E8F0', borderRadius: '6px',
-                background: '#fff', cursor: page === data.nb_pages ? 'not-allowed' : 'pointer', fontSize: '13px' }}>Suiv. →</button>
+        <div style={{ background: '#F0FDF4', borderRadius: '10px', padding: '8px 16px', textAlign: 'right' }}>
+          <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '2px' }}>SOLDE ACTUEL</div>
+          <div style={{ fontSize: '18px', fontWeight: '800', color: '#16A34A' }}>
+            {Number(caisse.solde_actuel).toLocaleString('fr-FR')} FCFA
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Tableau */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '32px', color: '#94A3B8' }}>⏳ Chargement...</div>
+      ) : !data?.transactions?.length ? (
+        <div style={{ textAlign: 'center', padding: '32px', color: '#94A3B8', fontSize: '14px' }}>
+          Aucune transaction pour cette caisse
+        </div>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ background: '#F8FAFC' }}>
+              {['Type', 'Motif', 'Montant (FCFA)', 'Date'].map(h => (
+                <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px',
+                  fontWeight: '700', color: '#64748B', textTransform: 'uppercase',
+                  letterSpacing: '0.5px', borderBottom: '1px solid #E2E8F0' }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.transactions.map((t, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #F1F5F9',
+                background: i % 2 === 0 ? '#fff' : '#FAFAFA' }}>
+                <td style={{ padding: '11px 14px' }}>
+                  <span style={{
+                    background: t.type === 'entree' ? '#F0FDF4' : '#FEF2F2',
+                    color: t.type === 'entree' ? '#16A34A' : '#DC2626',
+                    padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600'
+                  }}>
+                    {t.type === 'entree' ? '↑ Entrée' : '↓ Sortie'}
+                  </span>
+                </td>
+                <td style={{ padding: '11px 14px', fontSize: '13px', color: '#374151' }}>{t.motif || '—'}</td>
+                <td style={{ padding: '11px 14px', fontSize: '14px', fontWeight: '700',
+                  color: t.type === 'entree' ? '#16A34A' : '#DC2626' }}>
+                  {t.type === 'entree' ? '+' : '−'} {Number(t.montant).toLocaleString('fr-FR')}
+                </td>
+                <td style={{ padding: '11px 14px', fontSize: '12px', color: '#94A3B8' }}>{t.date}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {/* Pagination */}
+      {data?.nb_pages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '16px' }}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            style={{ padding: '6px 14px', border: '1.5px solid #E2E8F0', borderRadius: '6px',
+              background: page === 1 ? '#F8FAFC' : '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer',
+              fontSize: '13px', color: page === 1 ? '#CBD5E1' : '#374151' }}>
+            ← Préc.
+          </button>
+          <span style={{ fontSize: '13px', color: '#64748B' }}>
+            Page {page} / {data.nb_pages}
+          </span>
+          <button onClick={() => setPage(p => Math.min(data.nb_pages, p + 1))} disabled={page === data.nb_pages}
+            style={{ padding: '6px 14px', border: '1.5px solid #E2E8F0', borderRadius: '6px',
+              background: page === data.nb_pages ? '#F8FAFC' : '#fff',
+              cursor: page === data.nb_pages ? 'not-allowed' : 'pointer',
+              fontSize: '13px', color: page === data.nb_pages ? '#CBD5E1' : '#374151' }}>
+            Suiv. →
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Page principale Caisses ────────────────────────────────────────────────
+// ── Page principale Caisses ───────────────────────────────────────────────
 export default function RafCaisses() {
-  const [caisses, setCaisses]   = useState([])
-  const [kpis, setKpis]         = useState({ solde_total: 0, nb_actives: 0, nb_total: 0 })
-  const [loading, setLoading]   = useState(true)
+  const [caisses, setCaisses]         = useState([])
+  const [kpis, setKpis]               = useState({ solde_total: 0, nb_actives: 0, nb_total: 0 })
+  const [loading, setLoading]         = useState(true)
   const [filtreStatut, setFiltreStatut] = useState('')
-  const [filtreType, setFiltreType]     = useState('')
-  const [modal, setModal]       = useState(null)
-  const [modalTx, setModalTx]   = useState(null)
+  const [filtreType, setFiltreType]   = useState('')
+  const [modal, setModal]             = useState(null)
+  const [selectedCaisse, setSelectedCaisse] = useState(null)
 
   const fetchCaisses = useCallback(async () => {
     setLoading(true)
@@ -229,29 +254,45 @@ export default function RafCaisses() {
       if (res.ok) {
         setCaisses(data.caisses)
         setKpis(data.kpis)
+        // Par défaut : sélectionner la caisse principale (ou la première)
+        setSelectedCaisse(prev => {
+          if (prev) {
+            // Garder la sélection courante si elle existe encore
+            const found = data.caisses.find(c => c.id === prev.id)
+            if (found) return found
+          }
+          return data.caisses.find(c => c.type_caisse === 'principale') || data.caisses[0] || null
+        })
       }
-    } catch {}
+    } catch { /* empty */ }
     finally { setLoading(false) }
   }, [filtreStatut, filtreType])
 
   useEffect(() => { fetchCaisses() }, [fetchCaisses])
 
-  const handleToggle = async (id) => {
+  const handleToggle = async (e, id) => {
+    e.stopPropagation()
     if (!confirm('Activer / désactiver cette caisse ?')) return
     try {
       const res = await fetch(`${API}/caisses/${id}/toggle`, { method: 'PUT', headers: getHeaders() })
       if (res.ok) fetchCaisses()
-    } catch {}
+    } catch { /* empty */ }
   }
 
-  const handleSupprimer = async (id) => {
+  const handleSupprimer = async (e, id) => {
+    e.stopPropagation()
     if (!confirm('Supprimer cette caisse ? (solde doit être à 0)')) return
     try {
       const res  = await fetch(`${API}/caisses/${id}`, { method: 'DELETE', headers: getHeaders() })
       const data = await res.json()
       if (!res.ok) { alert(data.message); return }
       fetchCaisses()
-    } catch {}
+    } catch { /* empty */ }
+  }
+
+  const handleEdit = (e, caisse) => {
+    e.stopPropagation()
+    setModal(caisse)
   }
 
   const cardStyle = (bg) => ({
@@ -323,60 +364,85 @@ export default function RafCaisses() {
             🏦 Aucune caisse trouvée
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
-            {caisses.map(c => {
-              const typeInfo = TYPE_COLORS[c.type_caisse] || TYPE_COLORS.secondaire
-              return (
-                <div key={c.id} style={{ background: '#fff', borderRadius: '14px', padding: '22px',
-                  boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: '1px solid #F1F5F9',
-                  borderTop: `4px solid ${typeInfo.color}` }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div>
-                      <div style={{ fontSize: '15px', fontWeight: '700', color: '#1E293B' }}>{c.nom}</div>
-                      <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>{c.description || 'Pas de description'}</div>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+              {caisses.map(c => {
+                const typeInfo  = TYPE_COLORS[c.type_caisse] || TYPE_COLORS.secondaire
+                const isSelected = selectedCaisse?.id === c.id
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => setSelectedCaisse(c)}
+                    style={{
+                      background: '#fff', borderRadius: '14px', padding: '22px',
+                      boxShadow: isSelected
+                        ? `0 0 0 2.5px ${typeInfo.color}, 0 4px 16px rgba(0,0,0,0.10)`
+                        : '0 1px 4px rgba(0,0,0,0.07)',
+                      border: isSelected ? `1px solid ${typeInfo.color}` : '1px solid #F1F5F9',
+                      borderTop: `4px solid ${typeInfo.color}`,
+                      cursor: 'pointer',
+                      transition: 'box-shadow 0.18s, border-color 0.18s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ fontSize: '15px', fontWeight: '700', color: '#1E293B' }}>{c.nom}</div>
+                          {isSelected && (
+                            <span style={{ background: typeInfo.bg, color: typeInfo.color,
+                              fontSize: '10px', fontWeight: '700', padding: '2px 7px', borderRadius: '20px' }}>
+                              ✓ Sélectionnée
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#94A3B8', marginTop: '2px' }}>
+                          {c.description || 'Pas de description'}
+                        </div>
+                      </div>
+                      <span style={{ background: typeInfo.bg, color: typeInfo.color, padding: '3px 8px',
+                        borderRadius: '6px', fontSize: '11px', fontWeight: '700', flexShrink: 0 }}>
+                        {typeInfo.label}
+                      </span>
                     </div>
-                    <span style={{ background: typeInfo.bg, color: typeInfo.color, padding: '3px 8px',
-                      borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>
-                      {typeInfo.label}
-                    </span>
-                  </div>
 
-                  <div style={{ background: '#F8FAFC', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px' }}>
-                    <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '2px' }}>SOLDE ACTUEL</div>
-                    <div style={{ fontSize: '22px', fontWeight: '800', color: c.solde_actuel > 0 ? '#16A34A' : '#DC2626' }}>
-                      {Number(c.solde_actuel).toLocaleString('fr-FR')} <span style={{ fontSize: '13px', fontWeight: '600' }}>FCFA</span>
+                    <div style={{ background: '#F8FAFC', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px' }}>
+                      <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '2px' }}>SOLDE ACTUEL</div>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color: c.solde_actuel > 0 ? '#16A34A' : '#DC2626' }}>
+                        {Number(c.solde_actuel).toLocaleString('fr-FR')}
+                        <span style={{ fontSize: '13px', fontWeight: '600' }}> FCFA</span>
+                      </div>
                     </div>
-                  </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{
-                      background: c.statut === 'active' ? '#F0FDF4' : '#FEF2F2',
-                      color: c.statut === 'active' ? '#16A34A' : '#DC2626',
-                      padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600'
-                    }}>
-                      {c.statut === 'active' ? '● Active' : '● Inactive'}
-                    </span>
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button onClick={() => setModalTx(c)} title="Voir transactions"
-                        style={{ padding: '6px 10px', background: '#F8FAFC', border: '1px solid #E2E8F0',
-                          borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>📋</button>
-                      <button onClick={() => setModal(c)} title="Modifier"
-                        style={{ padding: '6px 10px', background: '#EFF6FF', border: 'none',
-                          borderRadius: '6px', cursor: 'pointer', fontSize: '13px', color: '#2563EB' }}>✏️</button>
-                      <button onClick={() => handleToggle(c.id)} title="Activer / Désactiver"
-                        style={{ padding: '6px 10px', background: '#FFF7ED', border: 'none',
-                          borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
-                        {c.statut === 'active' ? '⏸️' : '▶️'}
-                      </button>
-                      <button onClick={() => handleSupprimer(c.id)} title="Supprimer"
-                        style={{ padding: '6px 10px', background: '#FEF2F2', border: 'none',
-                          borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>🗑️</button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{
+                        background: c.statut === 'active' ? '#F0FDF4' : '#FEF2F2',
+                        color: c.statut === 'active' ? '#16A34A' : '#DC2626',
+                        padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600'
+                      }}>
+                        {c.statut === 'active' ? '● Active' : '● Inactive'}
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button onClick={e => handleEdit(e, c)} title="Modifier"
+                          style={{ padding: '6px 10px', background: '#EFF6FF', border: 'none',
+                            borderRadius: '6px', cursor: 'pointer', fontSize: '13px', color: '#2563EB' }}>✏️</button>
+                        <button onClick={e => handleToggle(e, c.id)} title="Activer / Désactiver"
+                          style={{ padding: '6px 10px', background: '#FFF7ED', border: 'none',
+                            borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>
+                          {c.statut === 'active' ? '⏸️' : '▶️'}
+                        </button>
+                        <button onClick={e => handleSupprimer(e, c.id)} title="Supprimer"
+                          style={{ padding: '6px 10px', background: '#FEF2F2', border: 'none',
+                            borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>🗑️</button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
+                )
+              })}
+            </div>
+
+            {/* Liste transactions inline */}
+            {selectedCaisse && <TransactionsList caisse={selectedCaisse} />}
+          </>
         )}
       </div>
 
@@ -387,7 +453,6 @@ export default function RafCaisses() {
           onSave={() => { setModal(null); fetchCaisses() }}
         />
       )}
-      {modalTx && <ModalTransactions caisse={modalTx} onClose={() => setModalTx(null)} />}
     </div>
   )
 }
