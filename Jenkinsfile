@@ -31,7 +31,7 @@ pipeline {
         stage('Build Docker') {
             steps {
                 echo '🐳 Construction des images Docker...'
-                sh 'docker-compose build --no-cache'
+                sh 'docker-compose -p fintrack build --no-cache'
             }
         }
 
