@@ -116,10 +116,11 @@ export default function RafBudgets() {
       const res  = await fetch(`${API}/budgets?annee=${annee}`, { headers: getHeaders() })
       const data = await res.json()
       if (res.ok) { setBudgets(data.budgets); setKpis(data.kpis) }
-    } catch {}
+    } catch { /* empty */ }
     finally { setLoading(false) }
   }, [annee])
 
+  // eslint-disable-next-line
   useEffect(() => { fetchBudgets() }, [fetchBudgets])
 
   const handleSupprimer = async (id) => {
@@ -127,7 +128,7 @@ export default function RafBudgets() {
     try {
       const res = await fetch(`${API}/budgets/${id}`, { method: 'DELETE', headers: getHeaders() })
       if (res.ok) fetchBudgets()
-    } catch {}
+    } catch { /* empty */ }
   }
 
   const getBarColor = (taux) => {

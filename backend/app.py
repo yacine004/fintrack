@@ -92,21 +92,27 @@ if __name__ == '__main__':
         from models import Etudiant, Caisse, Budget
         if db.session.query(Etudiant).count() == 0:
             etudiants = [
-                Etudiant(matricule='ISM2026001', nom='Diallo', prenom='Mamadou',
+                Etudiant(matricule='ISM2526/DK-00001', nom='Diallo', prenom='Mamadou',
                          email='m.diallo@ism.edu.sn', contact='77 111 11 11',
                          classe='L3', filiere='GLRS', annee_academique='2025-2026'),
-                Etudiant(matricule='ISM2026002', nom='Sarr', prenom='Fatou',
+                Etudiant(matricule='ISM2526/DK-00002', nom='Sarr', prenom='Fatou',
                          email='f.sarr@ism.edu.sn', contact='77 222 22 22',
-                         classe='L3', filiere='CDSD', annee_academique='2025-2026'),
-                Etudiant(matricule='ISM2026003', nom='Ndiaye', prenom='Ousmane',
+                         classe='M1', filiere='CDSD', annee_academique='2025-2026'),
+                Etudiant(matricule='ISM2526/DK-00003', nom='Ndiaye', prenom='Ousmane',
                          email='o.ndiaye@ism.edu.sn', contact='77 333 33 33',
                          classe='L2', filiere='GLRS', annee_academique='2025-2026'),
-                Etudiant(matricule='ISM2026004', nom='Ba', prenom='Aminata',
+                Etudiant(matricule='ISM2526/DK-00004', nom='Ba', prenom='Aminata',
                          email='a.ba@ism.edu.sn', contact='77 444 44 44',
-                         classe='L1', filiere='CDSD', annee_academique='2025-2026'),
-                Etudiant(matricule='ISM2026005', nom='Koné', prenom='Ibrahim',
+                         classe='M2', filiere='CDSD', annee_academique='2025-2026'),
+                Etudiant(matricule='ISM2526/DK-00005', nom='Koné', prenom='Ibrahim',
                          email='i.kone@ism.edu.sn', contact='77 555 55 55',
                          classe='L3', filiere='GLRS', annee_academique='2025-2026'),
+                Etudiant(matricule='ISM2526/DK-00006', nom='Fall', prenom='Aïssatou',
+                         email='a.fall@ism.edu.sn', contact='77 666 66 66',
+                         classe='L1', filiere='GLRS', annee_academique='2025-2026'),
+                Etudiant(matricule='ISM2526/DK-00007', nom='Mbaye', prenom='Cheikh',
+                         email='c.mbaye@ism.edu.sn', contact='77 777 77 77',
+                         classe='L2', filiere='CDSD', annee_academique='2025-2026'),
             ]
             db.session.add_all(etudiants)
             db.session.commit()
@@ -136,6 +142,93 @@ if __name__ == '__main__':
             db.session.add_all(budgets)
             db.session.commit()
             print("✅ Budgets créés")
+
+        # ── Données historiques 2025 (comparaison N vs N-1) ──────────────────
+        from models import Paiement, Depense
+        from datetime import datetime
+        from sqlalchemy import extract as sql_extract
+
+        paiements_2025_count = db.session.query(Paiement).filter(
+            sql_extract('year', Paiement.date_paiement) == 2025
+        ).count()
+
+        if paiements_2025_count == 0:
+            etu  = db.session.query(Etudiant).limit(5).all()
+            caisses_seed = db.session.query(Caisse).limit(3).all()
+            if etu and caisses_seed:
+                c1 = caisses_seed[0].id_caisse
+                c2 = caisses_seed[1].id_caisse if len(caisses_seed) > 1 else c1
+                e  = [e.id_etudiant for e in etu]
+
+                paiements_hist = [
+                    Paiement(id_etudiant=e[0], id_caisse=c1, montant=500000,
+                             mode_paiement='especes',  motif='Frais scolarité S1',
+                             date_paiement=datetime(2025, 1, 12)),
+                    Paiement(id_etudiant=e[1], id_caisse=c1, montant=500000,
+                             mode_paiement='virement', motif='Frais scolarité S1',
+                             date_paiement=datetime(2025, 1, 20)),
+                    Paiement(id_etudiant=e[2], id_caisse=c2, montant=350000,
+                             mode_paiement='wave',     motif='Acompte scolarité',
+                             date_paiement=datetime(2025, 2, 8)),
+                    Paiement(id_etudiant=e[3], id_caisse=c1, montant=500000,
+                             mode_paiement='cheque',   motif='Frais scolarité S1',
+                             date_paiement=datetime(2025, 2, 18)),
+                    Paiement(id_etudiant=e[4], id_caisse=c1, montant=500000,
+                             mode_paiement='especes',  motif='Frais scolarité S1',
+                             date_paiement=datetime(2025, 3, 5)),
+                    Paiement(id_etudiant=e[0], id_caisse=c2, montant=450000,
+                             mode_paiement='wave',     motif='Frais scolarité S2',
+                             date_paiement=datetime(2025, 4, 10)),
+                    Paiement(id_etudiant=e[1], id_caisse=c1, montant=500000,
+                             mode_paiement='virement', motif='Frais scolarité S2',
+                             date_paiement=datetime(2025, 5, 7)),
+                    Paiement(id_etudiant=e[2], id_caisse=c1, montant=500000,
+                             mode_paiement='especes',  motif='Frais scolarité S2',
+                             date_paiement=datetime(2025, 6, 3)),
+                    Paiement(id_etudiant=e[3], id_caisse=c2, montant=300000,
+                             mode_paiement='wave',     motif='Acompte S2',
+                             date_paiement=datetime(2025, 9, 15)),
+                    Paiement(id_etudiant=e[4], id_caisse=c1, montant=500000,
+                             mode_paiement='cheque',   motif='Frais scolarité S2',
+                             date_paiement=datetime(2025, 10, 2)),
+                    Paiement(id_etudiant=e[0], id_caisse=c1, montant=500000,
+                             mode_paiement='especes',  motif='Frais inscription 2025-2026',
+                             date_paiement=datetime(2025, 11, 18)),
+                    Paiement(id_etudiant=e[1], id_caisse=c2, montant=400000,
+                             mode_paiement='virement', motif='Frais inscription 2025-2026',
+                             date_paiement=datetime(2025, 12, 5)),
+                ]
+                db.session.add_all(paiements_hist)
+
+                depenses_hist = [
+                    Depense(id_caisse=c1, montant=120000, motif='Achat fournitures bureau',
+                            categorie='Fournitures', statut='validee',
+                            date_depense=datetime(2025, 1, 25)),
+                    Depense(id_caisse=c1, montant=750000, motif='Salaires personnel janvier',
+                            categorie='Salaires',    statut='validee',
+                            date_depense=datetime(2025, 2, 1)),
+                    Depense(id_caisse=c2, montant=85000,  motif='Maintenance climatisation',
+                            categorie='Maintenance', statut='validee',
+                            date_depense=datetime(2025, 3, 14)),
+                    Depense(id_caisse=c1, montant=160000, motif='Organisation journée portes ouvertes',
+                            categorie='Evenements',  statut='validee',
+                            date_depense=datetime(2025, 4, 22)),
+                    Depense(id_caisse=c1, montant=210000, motif='Achat licences logiciels',
+                            categorie='Informatique', statut='validee',
+                            date_depense=datetime(2025, 5, 30)),
+                    Depense(id_caisse=c1, montant=780000, motif='Salaires personnel second semestre',
+                            categorie='Salaires',    statut='validee',
+                            date_depense=datetime(2025, 9, 3)),
+                    Depense(id_caisse=c2, montant=95000,  motif='Fournitures pédagogiques',
+                            categorie='Fournitures', statut='validee',
+                            date_depense=datetime(2025, 10, 20)),
+                    Depense(id_caisse=c1, montant=175000, motif='Renouvellement équipements réseau',
+                            categorie='Informatique', statut='validee',
+                            date_depense=datetime(2025, 11, 28)),
+                ]
+                db.session.add_all(depenses_hist)
+                db.session.commit()
+                print("✅ Données historiques 2025 créées")
 
 
     app.run(debug=True, port=5000)

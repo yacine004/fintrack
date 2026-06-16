@@ -111,8 +111,8 @@ def generer():
 
     if type_rapport not in ('mensuel', 'trimestriel', 'annuel', 'personnalise'):
         return jsonify({'message': 'Type invalide'}), 400
-    if format_exp not in ('pdf', 'excel'):
-        return jsonify({'message': 'Format invalide : pdf | excel'}), 400
+    if format_exp not in ('pdf', 'excel', 'csv'):
+        return jsonify({'message': 'Format invalide : pdf | excel | csv'}), 400
     if type_rapport == 'personnalise' and not (date_debut and date_fin):
         return jsonify({'message': 'Date de début et de fin obligatoires pour un rapport personnalisé'}), 400
 
@@ -172,6 +172,8 @@ def exporter(rid):
         return _export_pdf(rapport, donnees)
     elif format_exp == 'excel':
         return _export_excel(rapport, donnees)
+    elif format_exp == 'csv':
+        return _export_csv(rapport, donnees)
     else:
         return jsonify({'message': 'Format invalide'}), 400
 
@@ -565,3 +567,65 @@ def _export_excel(rapport, donnees):
         return jsonify({'message': 'openpyxl non installé. Exécutez : pip install openpyxl'}), 500
     except Exception as e:
         return jsonify({'message': f'Erreur Excel : {str(e)}'}), 500
+
+
+def _export_csv(rapport, donnees):
+    try:
+        import csv
+
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=';')
+        type_lbl = TYPE_LABELS.get(donnees['type'], donnees['type'].capitalize())
+
+        writer.writerow(['FinTrack — ISM Dakar'])
+        writer.writerow([f"Rapport {type_lbl} | {donnees['debut']} → {donnees['fin']} | Caisse : {donnees['nom_caisse']}"])
+        writer.writerow([f"Généré le {rapport.date_creation.strftime('%d/%m/%Y à %H:%M')}"])
+        writer.writerow([])
+
+        writer.writerow(['INDICATEURS CLÉS'])
+        writer.writerow(['Total recettes (FCFA)', donnees['total_recettes']])
+        writer.writerow(['Total dépenses (FCFA)', donnees['total_depenses']])
+        writer.writerow(['Solde net (FCFA)',       donnees['solde_net']])
+        writer.writerow(['Nombre de paiements',    donnees['nb_paiements']])
+        writer.writerow(['Nombre de dépenses',     len(donnees['depenses'])])
+        writer.writerow([])
+
+        if donnees['paiements']:
+            writer.writerow(['PAIEMENTS'])
+            writer.writerow(['Matricule', 'Étudiant', 'Montant (FCFA)', 'Mode', 'Caisse', 'Date'])
+            for p in donnees['paiements']:
+                writer.writerow([
+                    p.get('matricule', ''),
+                    p.get('etudiant', ''),
+                    float(p['montant']),
+                    MODE_LABELS_R.get(p.get('mode_paiement', ''), p.get('mode_paiement', '')),
+                    p.get('caisse', ''),
+                    p.get('date_paiement', '')[:10] if p.get('date_paiement') else '',
+                ])
+            writer.writerow([])
+
+        if donnees['depenses']:
+            writer.writerow(['DÉPENSES VALIDÉES'])
+            writer.writerow(['Motif', 'Montant (FCFA)', 'Catégorie', 'Caisse', 'Date'])
+            for d in donnees['depenses']:
+                writer.writerow([
+                    d.get('motif', ''),
+                    float(d['montant']),
+                    d.get('categorie', ''),
+                    d.get('caisse', ''),
+                    d.get('date_depense', '')[:10] if d.get('date_depense') else '',
+                ])
+
+        # BOM UTF-8 pour compatibilité Excel
+        content = '﻿' + output.getvalue()
+        buffer = io.BytesIO(content.encode('utf-8'))
+
+        return send_file(
+            buffer,
+            mimetype='text/csv; charset=utf-8',
+            as_attachment=True,
+            download_name=f'rapport_{donnees["type"]}_{donnees["periode"]}.csv'
+        )
+
+    except Exception as e:
+        return jsonify({'message': f'Erreur CSV : {str(e)}'}), 500

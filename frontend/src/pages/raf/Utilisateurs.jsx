@@ -26,6 +26,7 @@ export default function Utilisateurs() {
   const [formError, setFormError]   = useState('')
   const [saving, setSaving]         = useState(false)
   const [success, setSuccess]       = useState('')
+  const [credentials, setCredentials] = useState(null)
 
   const fetchUsers = useCallback(async () => {
     setLoading(true)
@@ -66,8 +67,9 @@ export default function Utilisateurs() {
     setSaving(true)
     try {
       await api().post('/utilisateurs', form)
-      closeModal(); fetchUsers()
-      showSuccess('Utilisateur créé avec succès !')
+      fetchUsers()
+      closeModal()
+      setCredentials({ nom: form.prenom + ' ' + form.nom, email: form.email, password: form.password, role: form.role })
     } catch (e) { setFormError(e.response?.data?.message || 'Erreur') }
     finally { setSaving(false) }
   }
@@ -489,6 +491,65 @@ export default function Utilisateurs() {
                 : '🗑️ Supprimer'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal identifiants créés */}
+      {credentials && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          <div style={{ background: '#fff', borderRadius: '16px', padding: '36px',
+            width: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+            <h2 style={{ margin: '0 0 6px', fontSize: '20px', fontWeight: '800', color: '#1B3A6B' }}>
+              Compte créé avec succès
+            </h2>
+            <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#64748B' }}>
+              Communiquez ces identifiants à <strong>{credentials.nom}</strong>
+            </p>
+
+            <div style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0',
+              borderRadius: '12px', padding: '20px', textAlign: 'left', marginBottom: '20px' }}>
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8',
+                  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Rôle</div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1E293B', textTransform: 'capitalize' }}>
+                  {credentials.role}
+                </div>
+              </div>
+              <div style={{ marginBottom: '14px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8',
+                  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Email</div>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#1B3A6B',
+                  background: '#EFF6FF', padding: '8px 12px', borderRadius: '8px',
+                  fontFamily: 'monospace', letterSpacing: '0.3px' }}>
+                  {credentials.email}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8',
+                  textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Mot de passe</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: '#DC2626',
+                  background: '#FEF2F2', padding: '8px 12px', borderRadius: '8px',
+                  fontFamily: 'monospace', letterSpacing: '1px' }}>
+                  {credentials.password}
+                </div>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '12px', color: '#F59E0B', marginBottom: '20px',
+              background: '#FFF7ED', borderRadius: '8px', padding: '10px',
+              border: '1px solid #FCD34D' }}>
+              ⚠️ Ce mot de passe ne sera plus affiché. Notez-le avant de fermer.
+            </p>
+
+            <button onClick={() => setCredentials(null)}
+              style={{ width: '100%', padding: '12px', background: '#1B3A6B', color: '#fff',
+                border: 'none', borderRadius: '8px', fontSize: '15px',
+                fontWeight: '700', cursor: 'pointer' }}>
+              J'ai noté les identifiants — Fermer
+            </button>
           </div>
         </div>
       )}

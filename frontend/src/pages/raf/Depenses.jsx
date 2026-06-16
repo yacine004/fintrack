@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
@@ -154,6 +155,7 @@ function ModalDepense({ caisses, onClose, onSave }) {
 
 // ── Page principale Dépenses RAF ──────────────────────────────────────────────
 export default function RafDepenses() {
+  const navigate = useNavigate()
   const [depenses, setDepenses]   = useState([])
   const [kpis, setKpis]           = useState({ total_depenses: 0, total_depense: 0, nb_en_attente: 0 })
   const [caisses, setCaisses]     = useState([])
@@ -179,27 +181,29 @@ export default function RafDepenses() {
         setNbPages(data.nb_pages)
         setKpis(data.kpis)
       }
-    } catch {}
+    } catch { /* empty */ }
     finally { setLoading(false) }
   }, [page, filtreStatut, filtreCategorie])
 
-  const fetchCaisses = async () => {
+  const fetchCaisses = useCallback(async () => {
     try {
       const res  = await fetch(`${API}/caisses`, { headers: getHeaders() })
       const data = await res.json()
       if (res.ok) setCaisses(data.caisses)
-    } catch {}
-  }
+    } catch { /* empty */ }
+  }, [])
 
+  // eslint-disable-next-line
   useEffect(() => { fetchDepenses() }, [fetchDepenses])
-  useEffect(() => { fetchCaisses() }, [])
+  // eslint-disable-next-line
+  useEffect(() => { fetchCaisses() }, [fetchCaisses])
 
   const handleValider = async (id) => {
     if (!confirm('Valider cette dépense ?')) return
     try {
       const res = await fetch(`${API}/depenses/${id}/valider`, { method: 'PUT', headers: getHeaders() })
       if (res.ok) fetchDepenses()
-    } catch {}
+    } catch { /* empty */ }
   }
 
   const handleRejeter = async (id) => {
@@ -207,7 +211,7 @@ export default function RafDepenses() {
     try {
       const res = await fetch(`${API}/depenses/${id}/rejeter`, { method: 'PUT', headers: getHeaders() })
       if (res.ok) fetchDepenses()
-    } catch {}
+    } catch { /* empty */ }
   }
 
   return (
@@ -221,7 +225,7 @@ export default function RafDepenses() {
             <p style={{ margin: '4px 0 0', color: '#64748B', fontSize: '14px' }}>{total} dépense{total > 1 ? 's' : ''}</p>
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button onClick={() => window.location.href = '/raf/budgets'}
+            <button onClick={() => navigate('/raf/budgets')}
               style={{ padding: '11px 18px', background: '#EFF6FF', color: '#1D4ED8',
                 border: '1.5px solid #BFDBFE', borderRadius: '10px', cursor: 'pointer',
                 fontSize: '14px', fontWeight: '600' }}>

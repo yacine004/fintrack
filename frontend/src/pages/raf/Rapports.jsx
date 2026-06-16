@@ -97,7 +97,8 @@ export default function RafRapports() {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href     = url
-      a.download = `rapport_${id}.${fmt === 'pdf' ? 'pdf' : 'xlsx'}`
+      const ext = fmt === 'pdf' ? 'pdf' : fmt === 'csv' ? 'csv' : 'xlsx'
+      a.download = `rapport_${id}.${ext}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -181,6 +182,7 @@ export default function RafRapports() {
                   borderRadius: '8px', fontSize: '14px', outline: 'none' }}>
                 <option value="pdf">📄 PDF</option>
                 <option value="excel">📊 Excel</option>
+                <option value="csv">🗂️ CSV</option>
               </select>
             </div>
             <div>
@@ -209,7 +211,7 @@ export default function RafRapports() {
             display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ fontSize: '20px' }}>ℹ️</span>
             <span style={{ fontSize: '13px', color: '#64748B' }}>
-              {TYPE_INFO[type]?.desc} — Format : {format === 'pdf' ? 'PDF téléchargeable' : 'Excel (.xlsx)'}
+              {TYPE_INFO[type]?.desc} — Format : {format === 'pdf' ? 'PDF téléchargeable' : format === 'csv' ? 'CSV (compatible Excel / LibreOffice)' : 'Excel (.xlsx)'}
             </span>
           </div>
         </div>
@@ -259,10 +261,11 @@ export default function RafRapports() {
                       {r.nom_caisse || 'Toutes'}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
-                      <span style={{ background: r.format === 'pdf' ? '#FEF2F2' : '#F0FDF4',
-                        color: r.format === 'pdf' ? '#DC2626' : '#16A34A',
+                      <span style={{
+                        background: r.format === 'pdf' ? '#FEF2F2' : r.format === 'csv' ? '#F5F3FF' : '#F0FDF4',
+                        color: r.format === 'pdf' ? '#DC2626' : r.format === 'csv' ? '#7C3AED' : '#16A34A',
                         padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
-                        {r.format === 'pdf' ? '📄 PDF' : '📊 Excel'}
+                        {r.format === 'pdf' ? '📄 PDF' : r.format === 'csv' ? '🗂️ CSV' : '📊 Excel'}
                       </span>
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '12px', color: '#94A3B8' }}>
