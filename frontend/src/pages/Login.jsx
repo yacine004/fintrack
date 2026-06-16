@@ -3,6 +3,33 @@ import { useNavigate, Link } from 'react-router-dom'
 import axios from 'axios'
 import { useIsMobile } from '../hooks/useIsMobile'
 
+function FinTrackLogo({ size = 56 }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+      {/* Icon */}
+      <svg width={size} height={size} viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" rx="22" fill="#2D8CFF"/>
+        <polyline
+          points="14,78 30,58 46,64 64,36 80,22"
+          fill="none" stroke="white" strokeWidth="7"
+          strokeLinecap="round" strokeLinejoin="round"
+        />
+        <circle cx="80" cy="22" r="10" fill="#10B981"/>
+      </svg>
+      {/* Text */}
+      <div>
+        <div style={{ lineHeight: 1 }}>
+          <span style={{ fontSize: size * 0.57, fontWeight: '800', color: '#1B3A6B', fontFamily: 'Inter, sans-serif' }}>Fin</span>
+          <span style={{ fontSize: size * 0.57, fontWeight: '800', color: '#2D8CFF', fontFamily: 'Inter, sans-serif' }}>Track</span>
+        </div>
+        <div style={{ fontSize: size * 0.19, color: '#94A3B8', letterSpacing: '2.5px', fontWeight: '600', marginTop: '3px', fontFamily: 'Inter, sans-serif' }}>
+          GESTION FINANCIÈRE
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Login() {
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
@@ -39,7 +66,7 @@ export default function Login() {
     transition: 'border-color 0.2s',
   }
 
-  // ── Card with form ──────────────────────────────────────────────────
+  // ── Card with form ───────────────────────────────────────────────────
   const formCard = (
     <div style={{
       background: '#fff', borderRadius: '20px',
@@ -48,19 +75,8 @@ export default function Login() {
       boxShadow: '0 8px 40px rgba(15,23,42,0.12)',
     }}>
       {/* Logo */}
-      <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-        <div style={{
-          background: '#2D8CFF', borderRadius: '14px', width: '52px', height: '52px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 12px', fontSize: '24px',
-        }}>📈</div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-          <span style={{ fontSize: '22px', fontWeight: '800', color: '#1B3A6B' }}>Fin</span>
-          <span style={{ fontSize: '22px', fontWeight: '800', color: '#2D8CFF' }}>Track</span>
-        </div>
-        <p style={{ color: '#94A3B8', fontSize: '10px', letterSpacing: '2px', margin: '4px 0 0', fontWeight: '600' }}>
-          GESTION FINANCIÈRE
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '36px' }}>
+        <FinTrackLogo size={52} />
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -99,8 +115,7 @@ export default function Login() {
               onBlur={e => e.target.style.borderColor = '#E2E8F0'}
             />
             <button
-              type="button"
-              onClick={() => setShowPwd(!showPwd)}
+              type="button" onClick={() => setShowPwd(!showPwd)}
               style={{
                 position: 'absolute', right: '14px', top: '50%',
                 transform: 'translateY(-50%)', background: 'none',
@@ -148,7 +163,7 @@ export default function Login() {
           color: '#fff', border: 'none', borderRadius: '10px',
           fontSize: '15px', fontWeight: '700',
           cursor: loading ? 'not-allowed' : 'pointer',
-          marginBottom: '12px', letterSpacing: '0.2px',
+          marginBottom: '12px',
         }}>
           {loading ? '⏳ Connexion en cours...' : 'Se connecter  →'}
         </button>
@@ -176,7 +191,7 @@ export default function Login() {
     </div>
   )
 
-  // ── Mobile ──────────────────────────────────────────────────────────
+  // ── Mobile ───────────────────────────────────────────────────────────
   if (isMobile) {
     return (
       <div style={{
@@ -189,46 +204,47 @@ export default function Login() {
     )
   }
 
-  // ── Desktop: two-column ─────────────────────────────────────────────
+  // ── Desktop: two-column ──────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', height: '100dvh', fontFamily: 'Inter, sans-serif' }}>
 
-      {/* Left panel — dark photo overlay */}
+      {/* Left panel — background image + dark overlay + centered text */}
       <div style={{
         width: '52%', position: 'relative', overflow: 'hidden',
-        background: '#0a1628',
-        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '56px 52px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {/* Gradient overlay over background */}
+        {/* Background image — place login-bg.jpg in frontend/public/ */}
+        <img
+          src="/login-bg.jpg"
+          alt=""
+          style={{
+            position: 'absolute', inset: 0,
+            width: '100%', height: '100%', objectFit: 'cover',
+            objectPosition: 'center',
+          }}
+        />
+        {/* Dark overlay */}
         <div style={{
           position: 'absolute', inset: 0,
-          background: 'linear-gradient(135deg, rgba(8,14,35,0.82) 0%, rgba(11,30,70,0.70) 60%, rgba(15,45,100,0.55) 100%)',
-          zIndex: 1,
+          background: 'linear-gradient(160deg, rgba(8,14,35,0.78) 0%, rgba(11,30,75,0.72) 50%, rgba(6,20,55,0.80) 100%)',
         }} />
-        {/* Decorative blurred circles */}
+        {/* Soft glow */}
         <div style={{
-          position: 'absolute', top: '18%', right: '12%',
-          width: '340px', height: '340px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(45,140,255,0.18) 0%, transparent 70%)',
-          zIndex: 1,
-        }} />
-        <div style={{
-          position: 'absolute', bottom: '30%', left: '5%',
-          width: '200px', height: '200px', borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)',
-          zIndex: 1,
+          position: 'absolute', top: '20%', right: '10%',
+          width: '300px', height: '300px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(45,140,255,0.15) 0%, transparent 70%)',
         }} />
 
-        {/* Content */}
-        <div style={{ position: 'relative', zIndex: 2, maxWidth: '520px' }}>
+        {/* Centered text content */}
+        <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', padding: '0 52px', maxWidth: '560px' }}>
           <h1 style={{
-            color: '#fff', fontSize: '42px', fontWeight: '800',
-            lineHeight: '1.15', margin: '0 0 10px', letterSpacing: '-0.5px',
+            color: '#fff', fontSize: '40px', fontWeight: '800',
+            lineHeight: '1.2', margin: '0 0 8px', letterSpacing: '-0.5px',
           }}>
             La finance scolaire,
           </h1>
           <h1 style={{
-            fontSize: '42px', fontWeight: '800', lineHeight: '1.15',
+            fontSize: '40px', fontWeight: '800', lineHeight: '1.2',
             margin: '0 0 28px', letterSpacing: '-0.5px',
             background: 'linear-gradient(90deg, #2D8CFF, #38BDF8)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
@@ -237,7 +253,7 @@ export default function Login() {
           </h1>
           <p style={{
             color: 'rgba(226,232,240,0.80)', fontSize: '15px',
-            lineHeight: '1.65', margin: 0, fontWeight: '400',
+            lineHeight: '1.7', margin: 0, fontWeight: '400',
           }}>
             Plateforme de gestion financière dédiée à ISM École d'Ingénieurs.
             Suivez les paiements, gérez les budgets et générez vos rapports en temps réel.
@@ -245,7 +261,7 @@ export default function Login() {
         </div>
       </div>
 
-      {/* Right panel — card on gray background */}
+      {/* Right panel */}
       <div style={{
         flex: 1, background: '#EEF2F7',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
