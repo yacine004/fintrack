@@ -4,11 +4,11 @@ import axios from 'axios'
 import { useIsMobile } from '../hooks/useIsMobile'
 
 export default function Login() {
-  const [email, setEmail]     = useState('')
+  const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
-  const [showPwd, setShowPwd] = useState(false)
-  const [error, setError]     = useState('')
-  const [loading, setLoading] = useState(false)
+  const [showPwd, setShowPwd]   = useState(false)
+  const [error, setError]       = useState('')
+  const [loading, setLoading]   = useState(false)
   const navigate  = useNavigate()
   const isMobile  = useIsMobile()
 
@@ -32,165 +32,227 @@ export default function Login() {
   }
 
   const inputStyle = {
-    width: '100%', padding: '12px 14px', borderRadius: '8px',
+    width: '100%', padding: '13px 16px', borderRadius: '10px',
     border: '1.5px solid #E2E8F0', fontSize: '14px', outline: 'none',
     boxSizing: 'border-box', fontFamily: 'Inter, sans-serif',
-    background: '#fff',
+    background: '#F8FAFC', color: '#1E293B',
+    transition: 'border-color 0.2s',
   }
 
-  const formPanel = (
+  // ── Card with form ──────────────────────────────────────────────────
+  const formCard = (
     <div style={{
-      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: '#fff', padding: isMobile ? '32px 24px' : '48px 40px',
-      minHeight: isMobile ? '100dvh' : 'auto',
+      background: '#fff', borderRadius: '20px',
+      padding: isMobile ? '32px 24px' : '44px 40px',
+      width: '100%', maxWidth: '460px',
+      boxShadow: '0 8px 40px rgba(15,23,42,0.12)',
     }}>
-      <div style={{ width: '100%', maxWidth: '420px' }}>
+      {/* Logo */}
+      <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+        <div style={{
+          background: '#2D8CFF', borderRadius: '14px', width: '52px', height: '52px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 12px', fontSize: '24px',
+        }}>📈</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '22px', fontWeight: '800', color: '#1B3A6B' }}>Fin</span>
+          <span style={{ fontSize: '22px', fontWeight: '800', color: '#2D8CFF' }}>Track</span>
+        </div>
+        <p style={{ color: '#94A3B8', fontSize: '10px', letterSpacing: '2px', margin: '4px 0 0', fontWeight: '600' }}>
+          GESTION FINANCIÈRE
+        </p>
+      </div>
 
-        {/* Logo compact (mobile only) */}
-        {isMobile && (
-          <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-            <div style={{
-              background: '#1B3A6B', borderRadius: '16px', width: '60px', height: '60px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 14px', fontSize: '28px',
-            }}>📈</div>
-            <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '800', color: '#1B3A6B' }}>
-              Fin<span style={{ color: '#2D8CFF' }}>Track</span>
-            </h1>
-            <p style={{ color: '#64748B', fontSize: '11px', letterSpacing: '2px', marginTop: '4px' }}>
-              GESTION FINANCIÈRE SCOLAIRE
-            </p>
+      <form onSubmit={handleSubmit}>
+        {/* Email */}
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{
+            display: 'block', fontSize: '11px', fontWeight: '700',
+            color: '#64748B', marginBottom: '8px', letterSpacing: '1px',
+          }}>
+            ADRESSE E-MAIL
+          </label>
+          <input
+            type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="votre@ism.sn" required
+            style={inputStyle}
+            onFocus={e => e.target.style.borderColor = '#2D8CFF'}
+            onBlur={e => e.target.style.borderColor = '#E2E8F0'}
+          />
+        </div>
+
+        {/* Password */}
+        <div style={{ marginBottom: '8px' }}>
+          <label style={{
+            display: 'block', fontSize: '11px', fontWeight: '700',
+            color: '#64748B', marginBottom: '8px', letterSpacing: '1px',
+          }}>
+            MOT DE PASSE
+          </label>
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showPwd ? 'text' : 'password'} value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="••••••••" required
+              style={{ ...inputStyle, paddingRight: '48px' }}
+              onFocus={e => e.target.style.borderColor = '#2D8CFF'}
+              onBlur={e => e.target.style.borderColor = '#E2E8F0'}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPwd(!showPwd)}
+              style={{
+                position: 'absolute', right: '14px', top: '50%',
+                transform: 'translateY(-50%)', background: 'none',
+                border: 'none', cursor: 'pointer', padding: 0,
+                color: '#94A3B8', display: 'flex', alignItems: 'center',
+              }}
+            >
+              {showPwd ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Forgot password */}
+        <div style={{ textAlign: 'right', marginBottom: '24px' }}>
+          <span style={{ fontSize: '13px', color: '#2D8CFF', cursor: 'pointer', fontWeight: '500' }}>
+            Mot de passe oublié ?
+          </span>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div style={{
+            background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '8px',
+            padding: '10px 14px', marginBottom: '16px', color: '#991B1B', fontSize: '13px',
+          }}>
+            ⚠️ {error}
           </div>
         )}
 
-        <h2 style={{ fontSize: '26px', fontWeight: '700', color: '#1B3A6B', marginBottom: '6px', marginTop: 0 }}>
-          Connexion
-        </h2>
-        <p style={{ color: '#64748B', marginBottom: '32px', fontSize: '14px' }}>
-          Accédez à votre espace FinTrack
-        </p>
+        {/* Submit */}
+        <button type="submit" disabled={loading} style={{
+          width: '100%', padding: '14px',
+          background: loading ? '#475569' : '#0F172A',
+          color: '#fff', border: 'none', borderRadius: '10px',
+          fontSize: '15px', fontWeight: '700',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          marginBottom: '12px', letterSpacing: '0.2px',
+        }}>
+          {loading ? '⏳ Connexion en cours...' : 'Se connecter  →'}
+        </button>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
-              Adresse email
-            </label>
-            <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="votre@email.com" required
-              style={inputStyle}
-              onFocus={e => e.target.style.border = '1.5px solid #2D8CFF'}
-              onBlur={e => e.target.style.border = '1.5px solid #E2E8F0'}
-            />
-          </div>
+        {/* Student portal */}
+        <Link to="/suivi-paiements" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          width: '100%', padding: '14px',
+          background: '#2D8CFF', color: '#fff',
+          borderRadius: '10px', fontSize: '14px', fontWeight: '600',
+          textDecoration: 'none', boxSizing: 'border-box',
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          Consulter mes paiements (Portail Étudiant)
+        </Link>
+      </form>
 
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
-              Mot de passe
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPwd ? 'text' : 'password'} value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" required
-                style={{ ...inputStyle, paddingRight: '44px' }}
-                onFocus={e => e.target.style.border = '1.5px solid #2D8CFF'}
-                onBlur={e => e.target.style.border = '1.5px solid #E2E8F0'}
-              />
-              <span onClick={() => setShowPwd(!showPwd)} style={{
-                position: 'absolute', right: '14px', top: '50%',
-                transform: 'translateY(-50%)', cursor: 'pointer', fontSize: '18px',
-              }}>
-                {showPwd ? '🙈' : '👁️'}
-              </span>
-            </div>
-          </div>
-
-          {error && (
-            <div style={{
-              background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '8px',
-              padding: '10px 14px', marginBottom: '16px', color: '#991B1B', fontSize: '13px',
-            }}>
-              ⚠️ {error}
-            </div>
-          )}
-
-          <p style={{ textAlign: 'right', fontSize: '13px', color: '#2D8CFF', cursor: 'pointer', marginBottom: '28px', fontWeight: '500' }}>
-            Mot de passe oublié ?
-          </p>
-
-          <button type="submit" disabled={loading} style={{
-            width: '100%', padding: '13px',
-            background: loading ? '#93C5FD' : '#1B3A6B',
-            color: '#fff', border: 'none', borderRadius: '8px',
-            fontSize: '15px', fontWeight: '600',
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}>
-            {loading ? '⏳ Connexion en cours...' : 'Se connecter →'}
-          </button>
-        </form>
-
-        <div style={{ textAlign: 'center', marginTop: '28px' }}>
-          <Link to="/suivi-paiements" style={{
-            display: 'inline-block', padding: '9px 18px',
-            background: '#F1F5F9', color: '#1B3A6B', borderRadius: '8px',
-            fontSize: '13px', fontWeight: '600', textDecoration: 'none',
-            border: '1px solid #E2E8F0',
-          }}>
-            🎓 Consulter mes paiements (Portail Étudiant)
-          </Link>
-        </div>
-        <p style={{ textAlign: 'center', color: '#94A3B8', fontSize: '12px', marginTop: '20px' }}>
-          FinTrack © 2026 — ISM Dakar École d'Ingénieurs et Digital Campus
-        </p>
-      </div>
+      <p style={{ textAlign: 'center', color: '#CBD5E1', fontSize: '11px', marginTop: '28px', marginBottom: 0 }}>
+        FinTrack © 2026 — ISM Dakar École d'Ingénieurs et Digital Campus
+      </p>
     </div>
   )
 
-  // Mobile: form only
-  if (isMobile) return formPanel
+  // ── Mobile ──────────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div style={{
+        minHeight: '100dvh', background: '#F1F5F9',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '24px 16px', fontFamily: 'Inter, sans-serif',
+      }}>
+        {formCard}
+      </div>
+    )
+  }
 
-  // Desktop: two-column layout
+  // ── Desktop: two-column ─────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', height: '100dvh', fontFamily: 'Inter, sans-serif' }}>
 
-      {/* Left panel */}
+      {/* Left panel — dark photo overlay */}
       <div style={{
-        width: '45%', background: '#1B3A6B', display: 'flex',
-        flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px',
+        width: '52%', position: 'relative', overflow: 'hidden',
+        background: '#0a1628',
+        display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '56px 52px',
       }}>
-        <div style={{ textAlign: 'center', marginBottom: '48px' }}>
-          <div style={{
-            background: '#2D8CFF', borderRadius: '16px', width: '68px', height: '68px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px', fontSize: '32px',
-          }}>📈</div>
-          <h1 style={{ color: '#fff', fontSize: '38px', fontWeight: '800', margin: 0 }}>
-            Fin<span style={{ color: '#2D8CFF' }}>Track</span>
+        {/* Gradient overlay over background */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(135deg, rgba(8,14,35,0.82) 0%, rgba(11,30,70,0.70) 60%, rgba(15,45,100,0.55) 100%)',
+          zIndex: 1,
+        }} />
+        {/* Decorative blurred circles */}
+        <div style={{
+          position: 'absolute', top: '18%', right: '12%',
+          width: '340px', height: '340px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(45,140,255,0.18) 0%, transparent 70%)',
+          zIndex: 1,
+        }} />
+        <div style={{
+          position: 'absolute', bottom: '30%', left: '5%',
+          width: '200px', height: '200px', borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)',
+          zIndex: 1,
+        }} />
+
+        {/* Content */}
+        <div style={{ position: 'relative', zIndex: 2, maxWidth: '520px' }}>
+          <h1 style={{
+            color: '#fff', fontSize: '42px', fontWeight: '800',
+            lineHeight: '1.15', margin: '0 0 10px', letterSpacing: '-0.5px',
+          }}>
+            La finance scolaire,
           </h1>
-          <p style={{ color: '#93C5FD', letterSpacing: '3px', fontSize: '11px', marginTop: '6px' }}>
-            GESTION FINANCIÈRE SCOLAIRE
+          <h1 style={{
+            fontSize: '42px', fontWeight: '800', lineHeight: '1.15',
+            margin: '0 0 28px', letterSpacing: '-0.5px',
+            background: 'linear-gradient(90deg, #2D8CFF, #38BDF8)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          }}>
+            simplifiée et sécurisée.
+          </h1>
+          <p style={{
+            color: 'rgba(226,232,240,0.80)', fontSize: '15px',
+            lineHeight: '1.65', margin: 0, fontWeight: '400',
+          }}>
+            Plateforme de gestion financière dédiée à ISM École d'Ingénieurs.
+            Suivez les paiements, gérez les budgets et générez vos rapports en temps réel.
           </p>
         </div>
-        {[
-          ['✓', 'Suivi des paiements en temps réel'],
-          ['✓', 'Contrôle budgétaire automatique'],
-          ['✓', 'Rapports financiers en un clic'],
-          ['✓', 'Traçabilité complète des opérations'],
-        ].map(([icon, text], i) => (
-          <div key={i} style={{
-            display: 'flex', alignItems: 'center', gap: '14px',
-            marginBottom: '18px', color: '#E2E8F0', fontSize: '15px',
-            width: '100%', maxWidth: '320px',
-          }}>
-            <span style={{ color: '#10B981', fontSize: '20px', fontWeight: '700' }}>{icon}</span>
-            {text}
-          </div>
-        ))}
       </div>
 
-      {/* Right panel: form */}
-      {formPanel}
+      {/* Right panel — card on gray background */}
+      <div style={{
+        flex: 1, background: '#EEF2F7',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '40px 32px',
+      }}>
+        {formCard}
+      </div>
     </div>
   )
 }
