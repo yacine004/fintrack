@@ -259,9 +259,10 @@ def suivi_paiements():
     solde_restant = max(0.0, tarif_annuel - total_paye)
     a_jour        = _est_a_jour(echeancier_items, total_paye)
 
-    # Répartition par semestre (S1 = janv-juin, S2 = juil-déc)
-    s1 = [p for p in paiements if p.date_paiement.month <= 6]
-    s2 = [p for p in paiements if p.date_paiement.month > 6]
+    # S1 : septembre–janvier  |  S2 : février–juin
+    def _is_s1(m): return m >= 9 or m == 1
+    s1 = [p for p in paiements if _is_s1(p.date_paiement.month)]
+    s2 = [p for p in paiements if not _is_s1(p.date_paiement.month)]
 
     return jsonify({
         'etudiant': {
@@ -291,7 +292,7 @@ def suivi_paiements():
                 'motif':          p.motif or '',
                 'caisse':         p.caisse.nom if p.caisse else '',
                 'date_paiement':  p.date_paiement.strftime('%d/%m/%Y'),
-                'semestre':       'S1' if p.date_paiement.month <= 6 else 'S2',
+                'semestre':       'S1' if _is_s1(p.date_paiement.month) else 'S2',
             }
             for p in paiements
         ],
