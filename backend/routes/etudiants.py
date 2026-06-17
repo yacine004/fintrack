@@ -202,11 +202,42 @@ def stats():
 
 
 # ── PORTAIL PUBLIC : suivi paiements par matricule (sans JWT) ─────────────────
-# Tarifs annuels ISM Dakar École d'Ingénieurs et Digital Campus
-_TARIFS = {
-    'L1': 700_000, 'L2': 700_000, 'L3': 700_000,
-    'M1': 1_500_000, 'M2': 1_500_000,
-}
+# Barème ISM 2025-2026 (identique à ModalEcheancier.jsx)
+def _get_niveau(classe):
+    c = (classe or '').upper()
+    if 'M2' in c: return 'M2'
+    if 'M1' in c: return 'M1'
+    if 'L3' in c: return 'L3'
+    if 'L2' in c: return 'L2'
+    return 'L1'
+
+def _generer_echeancier(classe):
+    from datetime import date as _date
+    niveau = _get_niveau(classe)
+    frais_mensuel = 100_000 if niveau == 'M1' else 97_500 if niveau == 'M2' else 95_000
+    an = 2025
+    inscription = [
+        {'date': _date(an,   9, 5), 'montant': 112_500},
+        {'date': _date(an,  10, 5), 'montant': 112_500},
+        {'date': _date(an+1, 1, 5), 'montant': 112_500},
+        {'date': _date(an+1, 2, 5), 'montant': 112_500},
+    ]
+    mois = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
+    scolarite = [{'date': _date(an if m >= 9 else an+1, m, 5), 'montant': frais_mensuel} for m in mois]
+    encadrement = [{'date': _date(an+1, 3, 5), 'montant': 75_000}] if niveau == 'L3' else []
+    items = inscription + scolarite + encadrement
+    return items, sum(i['montant'] for i in items)
+
+def _est_a_jour(items, total_paye):
+    from datetime import date as _date
+    today = _date.today()
+    budget = total_paye
+    for item in items:
+        if budget >= item['montant']:
+            budget -= item['montant']
+        elif item['date'] <= today:
+            return False
+    return True
 
 @etudiants_bp.route('/suivi', methods=['GET'])
 def suivi_paiements():
@@ -223,10 +254,10 @@ def suivi_paiements():
                  .order_by(Paiement.date_paiement.asc())
                  .all())
 
-    tarif_annuel  = _TARIFS.get(etudiant.classe, 700_000)
+    echeancier_items, tarif_annuel = _generer_echeancier(etudiant.classe)
     total_paye    = sum(float(p.montant) for p in paiements)
     solde_restant = max(0.0, tarif_annuel - total_paye)
-    a_jour        = total_paye >= tarif_annuel
+    a_jour        = _est_a_jour(echeancier_items, total_paye)
 
     # Répartition par semestre (S1 = janv-juin, S2 = juil-déc)
     s1 = [p for p in paiements if p.date_paiement.month <= 6]
