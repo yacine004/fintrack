@@ -49,6 +49,8 @@ def seed():
                  contact='77 444 55 66', role='comptable',  mdp='comptable123'),
             dict(nom='Sène',   prenom='Awa',           email='a.sene@fintrack.sn',
                  contact='77 777 88 99', role='comptable',  mdp='comptable123'),
+            dict(nom='Inactif', prenom='Compte', email='inactif@fintrack.sn',
+                 contact='77 000 00 09', role='comptable', mdp='inactif123'),
         ]
         for c in comptes:
             if not Utilisateur.query.filter_by(email=c['email']).first():
@@ -59,6 +61,12 @@ def seed():
                 )
                 db.session.add(u)
         db.session.commit()
+
+        # Désactiver le compte de test (APRÈS la création de tous les comptes)
+        inactif = Utilisateur.query.filter_by(email='inactif@fintrack.sn').first()
+        if inactif:
+            inactif.actif = False
+            db.session.commit()
 
         raf       = Utilisateur.query.filter_by(email='raf@fintrack.sn').first()
         comptable = Utilisateur.query.filter_by(email='comptable@fintrack.sn').first()
