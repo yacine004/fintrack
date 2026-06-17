@@ -31,6 +31,7 @@ def seed():
         Budget.query.delete()
         Etudiant.query.delete()
         Caisse.query.delete()
+        Utilisateur.query.delete() 
         db.session.commit()
         print("🗑️  Anciennes données supprimées\n")
 
