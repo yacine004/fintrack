@@ -9,7 +9,7 @@ class TestDepenses:
     """Tests des endpoints /api/depenses"""
 
     def test_enregistrer_depense(self, client, headers_raf):
-        """T4.3 — POST /api/depenses → 201 + solde débité"""
+        """T4.3 — POST /api/depenses → 201, statut en_attente, solde inchangé (l'argent ne sort qu'au décaissement)"""
         res_caisse = client.get('/api/caisses/1', headers=headers_raf)
         solde_avant = res_caisse.get_json()['solde_actuel']
 
@@ -25,7 +25,9 @@ class TestDepenses:
         assert res.status_code == 201
         assert data['depense']['montant'] == 50000.0
         assert data['depense']['statut'] == 'en_attente'
-        assert data['nouveau_solde'] == solde_avant - 50000
+
+        res_caisse2 = client.get('/api/caisses/1', headers=headers_raf)
+        assert res_caisse2.get_json()['solde_actuel'] == solde_avant
 
     def test_enregistrer_depense_comptable(self, client, headers_comptable):
         """Comptable peut enregistrer une dépense → 201"""
@@ -50,7 +52,7 @@ class TestDepenses:
         assert res.status_code == 400
 
     def test_depense_solde_insuffisant(self, client, headers_raf):
-        """Solde insuffisant → 400"""
+        """Solde insuffisant détecté au décaissement (payer), pas à la création → 400"""
         res = client.post('/api/depenses',
                           json={
                               'id_caisse': 1,
@@ -58,7 +60,12 @@ class TestDepenses:
                               'motif': 'Dépassement solde'
                           },
                           headers=headers_raf)
-        assert res.status_code == 400
+        assert res.status_code == 201
+        did = res.get_json()['depense']['id']
+
+        client.put(f'/api/depenses/{did}/valider', headers=headers_raf)
+        res2 = client.put(f'/api/depenses/{did}/payer', headers=headers_raf)
+        assert res2.status_code == 400
 
     def test_depense_champs_manquants(self, client, headers_raf):
         """Champs obligatoires manquants → 400"""
@@ -68,7 +75,7 @@ class TestDepenses:
         assert res.status_code == 400
 
     def test_depense_avec_alerte_budget(self, client, headers_raf):
-        """T4.4 — Dépense dépassant budget → 201 + alerte_budget"""
+        """T4.4 — Dépense dépassant budget, détectée au décaissement → alerte_budget"""
         res = client.post('/api/depenses',
                           json={
                               'id_caisse': 1,
@@ -77,8 +84,13 @@ class TestDepenses:
                               'categorie': 'Fournitures'
                           },
                           headers=headers_raf)
-        data = res.get_json()
         assert res.status_code == 201
+        did = res.get_json()['depense']['id']
+
+        client.put(f'/api/depenses/{did}/valider', headers=headers_raf)
+        res2 = client.put(f'/api/depenses/{did}/payer', headers=headers_raf)
+        data = res2.get_json()
+        assert res2.status_code == 200
         assert data.get('alerte_budget') is not None
 
     def test_liste_depenses(self, client, headers_raf):
@@ -121,7 +133,8 @@ class TestDepenses:
         assert res.status_code == 403
 
     def test_rejeter_depense_raf(self, client, headers_raf):
-        """T4.8 — PUT /api/depenses/<id>/rejeter avec RAF → 200 + remboursement"""
+        """T4.8 — PUT /api/depenses/<id>/rejeter avec RAF → 200, aucun remboursement nécessaire
+        (l'argent ne sort qu'au décaissement « payer », donc rien à rembourser sur rejet)"""
         # Créer une dépense en attente
         res_d = client.post('/api/depenses',
                             json={
@@ -140,10 +153,9 @@ class TestDepenses:
         assert res.status_code == 200
         assert data['depense']['statut'] == 'rejetee'
 
-        # Vérifier remboursement
         res_caisse2 = client.get('/api/caisses/1', headers=headers_raf)
         solde_apres = res_caisse2.get_json()['solde_actuel']
-        assert solde_apres == solde_avant + 5000
+        assert solde_apres == solde_avant
 
     def test_valider_depense_deja_validee(self, client, headers_raf):
         """Valider une dépense déjà validée → 400"""
