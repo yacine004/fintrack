@@ -19,13 +19,20 @@ export function getNiveau(classe) {
 }
 
 export function genererEcheancier(niveau) {
-  const fraisMensuel = niveau === 'M1' ? 100000 : niveau === 'M2' ? 97500 : 95000
+  const fraisMensuel = niveau === 'M1' ? 100000 : niveau === 'M2' ? 97500 : niveau === 'L3' ? 92500 : 95000
+  const isMaster = niveau === 'M1' || niveau === 'M2'
 
-  const inscription = [
+  // Droits d'inscription : dates différentes Licence (sept/oct/fév/mars) vs Master (oct/nov/mars/avril)
+  const inscription = isMaster ? [
+    { key: 'ins1', date: new Date(2025, 9,  5), label: "Tranche 1/4 — Droits d'inscription", montant: 112500 },
+    { key: 'ins2', date: new Date(2025, 10, 5), label: "Tranche 2/4 — Droits d'inscription", montant: 112500 },
+    { key: 'ins3', date: new Date(2026, 2,  5), label: "Tranche 3/4 — Droits d'inscription", montant: 112500 },
+    { key: 'ins4', date: new Date(2026, 3,  5), label: "Tranche 4/4 — Droits d'inscription", montant: 112500 },
+  ] : [
     { key: 'ins1', date: new Date(2025, 8,  5), label: "Tranche 1/4 — Droits d'inscription", montant: 112500 },
     { key: 'ins2', date: new Date(2025, 9,  5), label: "Tranche 2/4 — Droits d'inscription", montant: 112500 },
-    { key: 'ins3', date: new Date(2026, 0,  5), label: "Tranche 3/4 — Droits d'inscription", montant: 112500 },
-    { key: 'ins4', date: new Date(2026, 1,  5), label: "Tranche 4/4 — Droits d'inscription", montant: 112500 },
+    { key: 'ins3', date: new Date(2026, 1,  5), label: "Tranche 3/4 — Droits d'inscription", montant: 112500 },
+    { key: 'ins4', date: new Date(2026, 2,  5), label: "Tranche 4/4 — Droits d'inscription", montant: 112500 },
   ]
 
   const moisData = [
@@ -44,13 +51,16 @@ export function genererEcheancier(niveau) {
     key: `sc${i + 1}`, date, label: `Mensualité — ${mois}`, montant: fraisMensuel
   }))
 
+  // Frais d'encadrement et de soutenance de mémoire : 25 000 FCFA, L3 et M2 uniquement
   const encadrement = niveau === 'L3' ? [
-    { key: 'enc1', date: new Date(2026, 2, 5), label: 'Encadrement & Soutenance de mémoire', montant: 75000 },
+    { key: 'enc1', date: new Date(2026, 2, 5), label: "Frais d'encadrement et de soutenance de mémoire", montant: 25000 },
+  ] : niveau === 'M2' ? [
+    { key: 'enc1', date: new Date(2026, 4, 5), label: "Frais d'encadrement et de soutenance de mémoire", montant: 25000 },
   ] : []
 
   const totalInscription = 4 * 112500
   const totalScolarite   = 10 * fraisMensuel
-  const totalEncadrement = niveau === 'L3' ? 75000 : 0
+  const totalEncadrement = (niveau === 'L3' || niveau === 'M2') ? 25000 : 0
   const totalAnnuel      = totalInscription + totalScolarite + totalEncadrement
 
   return { inscription, scolarite, encadrement, totalInscription, totalScolarite, totalEncadrement, totalAnnuel, niveau, fraisMensuel }
@@ -76,30 +86,144 @@ function fmtDate(d) {
 }
 
 // ── Modal Paiement (partagée) ─────────────────────────────────────────────────
+// Le montant n'est jamais saisi manuellement : il est calculé depuis l'échéancier.
+// Si defaultEtudiant est fourni, l'étudiant est pré-sélectionné (ex: depuis ModalEcheancier).
+// Sinon, le caissier tape le matricule pour trouver l'étudiant.
 
-export function ModalPaiement({ etudiants, caisses, defaultEtudiant, onClose, onSave, onRecu, zIndex = 1000 }) {
-  const [form, setForm] = useState({
-    id_etudiant: defaultEtudiant?.id?.toString() || '',
-    id_caisse: '', montant: '',
-    mode_paiement: 'especes', motif: '', reference: ''
+export function ModalPaiement({ defaultEtudiant, paiementsInitiaux, caisses, onClose, onSave, onRecu, zIndex = 1000 }) {
+  const [matriculeInput, setMatriculeInput] = useState(defaultEtudiant?.matricule || '')
+  const [etudiant, setEtudiant]             = useState(defaultEtudiant || null)
+  const [suggestions, setSuggestions]       = useState([])
+  const [searchLoading, setSearchLoading]   = useState(false)
+  const [paiementsEtu, setPaiementsEtu]     = useState(paiementsInitiaux || [])
+  const [loadingEtu, setLoadingEtu]         = useState(false)
+  const [selectedAmounts, setSelectedAmounts] = useState(new Map()) // key → montant encaissé
+  const [showAvance, setShowAvance]         = useState(false)
+  const [idCaisse, setIdCaisse]             = useState('')
+  const [mode, setMode]                     = useState('especes')
+  const [prochainRef, setProchainRef]       = useState('')
+  const [erreur, setErreur]                 = useState('')
+  const [loading, setLoading]               = useState(false)
+  const [success, setSuccess]               = useState(null)
+
+  // Caisse auto-assignée (caissier) vs sélectable (RAF)
+  const userRole       = JSON.parse(localStorage.getItem('user') || '{}').role || 'comptable'
+  const [caisseAffectee, setCaisseAffectee] = useState(null)
+  const [loadingCaisse, setLoadingCaisse]   = useState(false)
+  const [erreurCaisse, setErreurCaisse]     = useState('')
+
+  const chargerPaiements = useCallback(async (id, annee) => {
+    setLoadingEtu(true)
+    try {
+      const params = new URLSearchParams({ etudiant_id: id, limit: 200 })
+      if (annee) params.set('annee', annee)
+      const res  = await fetch(`${API}/paiements?${params}`, { headers: getHeaders() })
+      const data = await res.json()
+      if (res.ok) setPaiementsEtu(data.paiements)
+    } catch {}
+    finally { setLoadingEtu(false) }
+  }, [])
+
+  // eslint-disable-next-line
+  useEffect(() => { if (defaultEtudiant && !paiementsInitiaux) chargerPaiements(defaultEtudiant.id, defaultEtudiant.annee_academique) }, [])
+
+  // Fetch prochain numéro de référence (lecture seule, pour affichage)
+  // eslint-disable-next-line
+  useEffect(() => {
+    fetch(`${API}/paiements/prochain-numero`, { headers: getHeaders() })
+      .then(r => r.json())
+      .then(data => { if (data.reference) setProchainRef(data.reference) })
+      .catch(() => {})
+  }, [])
+
+  // Fetch caisse assignée si caissier (comptable)
+  // eslint-disable-next-line
+  useEffect(() => {
+    if (userRole === 'raf') return
+    setLoadingCaisse(true)
+    fetch(`${API}/affectations/ma-caisse`, { headers: getHeaders() })
+      .then(r => r.json())
+      .then(data => {
+        if (data.caisse) {
+          setCaisseAffectee(data.caisse)
+          setIdCaisse(String(data.caisse.id))
+        } else {
+          setErreurCaisse(data.message || 'Aucune caisse assignée — contactez le RAF')
+        }
+      })
+      .catch(() => setErreurCaisse('Impossible de récupérer la caisse assignée'))
+      .finally(() => setLoadingCaisse(false))
+  }, [])
+
+  // Autocomplete par matricule/nom (debounce 300 ms) — uniquement sans defaultEtudiant
+  useEffect(() => {
+    if (defaultEtudiant || matriculeInput.trim().length < 2) { setSuggestions([]); return }
+    const t = setTimeout(async () => {
+      setSearchLoading(true)
+      try {
+        const res  = await fetch(`${API}/etudiants?search=${encodeURIComponent(matriculeInput.trim())}&statut=actif&limit=6`, { headers: getHeaders() })
+        const data = await res.json()
+        if (res.ok) setSuggestions(data.etudiants || [])
+      } catch {}
+      finally { setSearchLoading(false) }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [matriculeInput, defaultEtudiant])
+
+  const selectStudent = async (etu) => {
+    setEtudiant(etu); setMatriculeInput(etu.matricule)
+    setSuggestions([]); setSelectedAmounts(new Map()); setShowAvance(false)
+    await chargerPaiements(etu.id, etu.annee_academique)
+  }
+
+  // Calculs échéancier
+  const niveau     = etudiant ? getNiveau(etudiant.classe) : 'L1'
+  const ech        = genererEcheancier(niveau)
+  const totalPaye  = paiementsEtu.reduce((s, p) => s + parseFloat(p.montant), 0)
+  const statuts    = etudiant ? calculerStatuts(ech, totalPaye) : {}
+  const allItems   = [...ech.inscription, ...ech.scolarite, ...ech.encadrement]
+  const dues       = allItems.filter(i => statuts[i.key] === 'du')
+  const futures    = allItems.filter(i => statuts[i.key] === 'attente')
+
+  const selectedKeys = new Set(selectedAmounts.keys())
+
+  // La Map stocke des strings pour laisser l'input se vider librement
+  const toggleKey = (key, fullMontant) => setSelectedAmounts(prev => {
+    const next = new Map(prev)
+    next.has(key) ? next.delete(key) : next.set(key, String(fullMontant))
+    return next
   })
-  const [erreur, setErreur]   = useState('')
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(null)
 
-  const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
-
-  const handleSubmit = async () => {
-    if (!form.id_etudiant || !form.id_caisse || !form.montant || !form.mode_paiement) {
-      setErreur('Étudiant, caisse, montant et mode sont obligatoires')
+  const setAmount = (key, rawValue, maxMontant) => {
+    if (rawValue === '') {
+      setSelectedAmounts(prev => { const next = new Map(prev); next.set(key, ''); return next })
       return
     }
-    if (parseFloat(form.montant) <= 0) { setErreur('Le montant doit être positif'); return }
+    const parsed = parseInt(rawValue, 10)
+    if (isNaN(parsed)) return
+    setSelectedAmounts(prev => {
+      const next = new Map(prev)
+      next.set(key, String(Math.min(parsed, maxMontant)))
+      return next
+    })
+  }
+
+  const montantTotal = [...selectedAmounts.values()].reduce((s, v) => s + (parseInt(v, 10) || 0), 0)
+  const autoMotif    = allItems.filter(i => selectedKeys.has(i.key)).map(i => {
+    const custom = parseInt(selectedAmounts.get(i.key), 10) || 0
+    return custom < i.montant ? `${i.label} (partiel : ${custom.toLocaleString('fr-FR')} FCFA)` : i.label
+  }).join(' ; ')
+  const canSubmit    = etudiant && montantTotal > 0 && idCaisse && !erreurCaisse
+
+  const handleSubmit = async () => {
+    if (!etudiant)               { setErreur('Veuillez sélectionner un étudiant'); return }
+    if (montantTotal === 0) { setErreur('Sélectionnez au moins une échéance à régler'); return }
+    if (!idCaisse)               { setErreur('Sélectionnez une caisse'); return }
     setLoading(true); setErreur('')
     try {
       const res  = await fetch(`${API}/paiements`, {
         method: 'POST', headers: getHeaders(),
-        body: JSON.stringify({ ...form, montant: parseFloat(form.montant) })
+        body: JSON.stringify({ id_etudiant: etudiant.id, id_caisse: idCaisse, montant: montantTotal, mode_paiement: mode, motif: autoMotif })
       })
       const data = await res.json()
       if (!res.ok) { setErreur(data.message); return }
@@ -108,41 +232,89 @@ export function ModalPaiement({ etudiants, caisses, defaultEtudiant, onClose, on
     finally { setLoading(false) }
   }
 
-  const inputStyle = {
-    width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
-    borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box'
-  }
-  const labelStyle = {
-    display: 'block', fontSize: '12px', fontWeight: '600',
-    color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px'
+  const inputStyle = { width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }
+  const labelStyle = { display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }
+
+  const renderRow = (item, selectable) => {
+    const isSelected  = selectedKeys.has(item.key)
+    const isPaid      = statuts[item.key] === 'paye'
+    const rawStr      = selectedAmounts.get(item.key) ?? String(item.montant)
+    const customAmt   = parseInt(rawStr, 10) || 0   // valeur numérique pour calculs/affichage
+    const isPartial   = isSelected && customAmt < item.montant
+
+    return (
+      <div key={item.key} style={{ marginBottom: '6px' }}>
+        {/* Ligne principale */}
+        <div
+          onClick={() => selectable && !isPaid && toggleKey(item.key, item.montant)}
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 14px', borderRadius: isSelected ? '8px 8px 0 0' : '8px', border: `1.5px solid ${isSelected ? '#1B3A6B' : '#E2E8F0'}`, borderBottom: isSelected ? '1px solid #BAE6FD' : undefined, background: isPaid ? '#F8FAFC' : isSelected ? '#EFF6FF' : '#fff', cursor: selectable && !isPaid ? 'pointer' : 'default', opacity: isPaid ? 0.5 : 1 }}>
+          {selectable && !isPaid ? (
+            <div style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0, border: `2px solid ${isSelected ? '#1B3A6B' : '#CBD5E1'}`, background: isSelected ? '#1B3A6B' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {isSelected && <span style={{ color: '#fff', fontSize: '11px', fontWeight: '700' }}>✓</span>}
+            </div>
+          ) : <div style={{ width: '18px', flexShrink: 0 }} />}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: isPaid ? '#94A3B8' : '#1E293B' }}>{item.label}</div>
+            <div style={{ fontSize: '11px', color: '#94A3B8' }}>{fmtDate(item.date)}</div>
+          </div>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: isPaid ? '#94A3B8' : isPartial ? '#EA580C' : '#1B3A6B', textAlign: 'right' }}>
+            {isPartial ? `${customAmt.toLocaleString('fr-FR')} FCFA` : `${item.montant.toLocaleString('fr-FR')} FCFA`}
+          </div>
+          {isPaid && <span style={{ background: '#F0FDF4', color: '#16A34A', padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', flexShrink: 0 }}>✅ Payé</span>}
+          {isPartial && <span style={{ background: '#FFF7ED', color: '#EA580C', padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', flexShrink: 0 }}>Partiel</span>}
+        </div>
+        {/* Zone montant — visible quand la ligne est cochée et non payée */}
+        {isSelected && !isPaid && (
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px', background: '#F0F9FF', border: '1.5px solid #1B3A6B', borderTop: 'none', borderRadius: '0 0 8px 8px' }}>
+            <span style={{ fontSize: '12px', color: '#475569', fontWeight: '600', whiteSpace: 'nowrap' }}>Montant à encaisser :</span>
+            <input
+              type="number"
+              value={rawStr}
+              onChange={e => setAmount(item.key, e.target.value, item.montant)}
+              min={1}
+              max={item.montant}
+              style={{ flex: 1, padding: '5px 10px', border: `1.5px solid ${isPartial ? '#EA580C' : '#1B3A6B'}`, borderRadius: '6px', fontSize: '14px', fontWeight: '700', color: isPartial ? '#EA580C' : '#1B3A6B', outline: 'none', boxSizing: 'border-box' }}
+            />
+            <span style={{ fontSize: '12px', color: '#94A3B8', whiteSpace: 'nowrap' }}>
+              / {item.montant.toLocaleString('fr-FR')} FCFA
+            </span>
+            {isPartial && (
+              <button
+                onClick={() => setAmount(item.key, String(item.montant), item.montant)}
+                style={{ padding: '4px 10px', background: '#EFF6FF', color: '#1B3A6B', border: '1px solid #BFDBFE', borderRadius: '6px', cursor: 'pointer', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                Tout payer
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    )
   }
 
+  // ── Écran succès ──────────────────────────────────────────────────────────
   if (success) {
     return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex }}>
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '40px',
-          width: '440px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex }}>
+        <div style={{ background: '#fff', borderRadius: '16px', padding: '40px', width: '440px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
           <div style={{ fontSize: '60px', marginBottom: '16px' }}>✅</div>
           <h2 style={{ color: '#16A34A', fontSize: '22px', margin: '0 0 8px' }}>Paiement enregistré !</h2>
-          <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '20px' }}>
-            Montant : <strong>{parseFloat(form.montant).toLocaleString('fr-FR')} FCFA</strong>
+          <p style={{ color: '#64748B', fontSize: '14px', marginBottom: '4px' }}>
+            {etudiant?.prenom} {etudiant?.nom} — <strong>{montantTotal.toLocaleString('fr-FR')} FCFA</strong>
           </p>
+          <p style={{ color: '#94A3B8', fontSize: '12px', marginBottom: '20px', lineHeight: '1.5' }}>{autoMotif}</p>
           <div style={{ background: '#F0FDF4', borderRadius: '10px', padding: '12px 16px', marginBottom: '24px' }}>
             <div style={{ fontSize: '12px', color: '#64748B' }}>Nouveau solde caisse</div>
-            <div style={{ fontSize: '20px', fontWeight: '800', color: '#16A34A' }}>
-              {success.nouveau_solde?.toLocaleString('fr-FR')} FCFA
-            </div>
+            <div style={{ fontSize: '20px', fontWeight: '800', color: '#16A34A' }}>{success.nouveau_solde?.toLocaleString('fr-FR')} FCFA</div>
           </div>
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button onClick={() => onRecu?.(success.paiement.id)}
-              style={{ padding: '10px 20px', background: '#1B3A6B', color: '#fff',
-                border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
+            <button onClick={() => onRecu?.(success.paiement.id, success.paiement.reference)}
+              style={{ padding: '10px 20px', background: '#1B3A6B', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
               🖨️ Voir le reçu PDF
             </button>
-            <button onClick={() => { onSave(); onClose() }}
-              style={{ padding: '10px 20px', background: '#F1F5F9', color: '#374151',
-                border: '1.5px solid #E2E8F0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>
+            <button onClick={() => { onSave?.(); onClose() }}
+              style={{ padding: '10px 20px', background: '#F1F5F9', color: '#374151', border: '1.5px solid #E2E8F0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>
               Fermer
             </button>
           </div>
@@ -151,85 +323,201 @@ export function ModalPaiement({ etudiants, caisses, defaultEtudiant, onClose, on
     )
   }
 
+  // ── Formulaire principal ──────────────────────────────────────────────────
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex }}>
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '32px',
-        width: '560px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex, padding: '16px' }}>
+      <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', width: '620px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
           <h2 style={{ margin: 0, fontSize: '20px', color: '#1B3A6B', fontWeight: '700' }}>💳 Enregistrer un paiement</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#64748B' }}>✕</button>
         </div>
 
         {erreur && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px',
-            padding: '10px 14px', marginBottom: '16px', color: '#DC2626', fontSize: '13px' }}>
+          <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', color: '#DC2626', fontSize: '13px' }}>
             ⚠️ {erreur}
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={labelStyle}>Étudiant *</label>
-            <select name="id_etudiant" value={form.id_etudiant} onChange={handleChange} style={inputStyle}>
-              <option value="">Sélectionner un étudiant</option>
-              {etudiants.map(e => (
-                <option key={e.id} value={e.id}>
-                  {e.matricule} — {e.prenom} {e.nom} ({e.classe})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div>
-              <label style={labelStyle}>Montant (FCFA) *</label>
-              <input name="montant" type="number" value={form.montant} onChange={handleChange}
-                placeholder="150000" min="0" step="500" style={inputStyle} />
+        {/* ── Recherche étudiant (si pas de defaultEtudiant) ── */}
+        {!defaultEtudiant && (
+          <div style={{ marginBottom: '20px', position: 'relative' }}>
+            <label style={labelStyle}>Matricule ou nom de l'étudiant *</label>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                value={matriculeInput}
+                onChange={e => { setMatriculeInput(e.target.value); setEtudiant(null); setPaiementsEtu([]); setSelectedAmounts(new Map()) }}
+                placeholder="Ex: ISM-2024-001 ou Diallo…"
+                style={{ ...inputStyle, flex: 1 }}
+                autoFocus
+              />
+              {searchLoading && <span style={{ color: '#94A3B8', fontSize: '13px' }}>⏳</span>}
             </div>
+            {suggestions.length > 0 && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10, background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.12)', overflow: 'hidden', marginTop: '4px' }}>
+                {suggestions.map(s => (
+                  <div key={s.id}
+                    onClick={() => selectStudent(s)}
+                    style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', gap: '10px' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#fff'}>
+                    <span style={{ background: '#EFF6FF', color: '#1B3A6B', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{s.matricule}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#1E293B' }}>{s.prenom} {s.nom}</span>
+                    <span style={{ fontSize: '12px', color: '#94A3B8', marginLeft: 'auto' }}>{s.classe}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Bandeau étudiant sélectionné ── */}
+        {etudiant && (
+          <div style={{ background: 'linear-gradient(135deg, #EFF6FF, #F0F9FF)', border: '1.5px solid #BAE6FD', borderRadius: '10px', padding: '12px 16px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ background: '#1B3A6B', color: '#fff', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: '700', flexShrink: 0 }}>{etudiant.matricule}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>{etudiant.prenom} {etudiant.nom}</div>
+              <div style={{ fontSize: '12px', color: '#64748B' }}>{etudiant.classe}{etudiant.filiere ? ` — ${etudiant.filiere}` : ''}</div>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ fontSize: '11px', color: '#64748B' }}>Déjà réglé</div>
+              <div style={{ fontSize: '15px', fontWeight: '800', color: '#16A34A' }}>{totalPaye.toLocaleString('fr-FR')} FCFA</div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Sélection des échéances ── */}
+        {etudiant && (
+          <div style={{ marginBottom: '20px' }}>
+            {loadingEtu ? (
+              <div style={{ textAlign: 'center', padding: '24px', color: '#94A3B8' }}>⏳ Chargement de l'échéancier...</div>
+            ) : (
+              <>
+                {/* Échéances dues */}
+                {dues.length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: '700', color: '#DC2626', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>
+                      ❌ Échéances dues — {dues.length} à régler
+                    </div>
+                    {dues.map(item => renderRow(item, true))}
+                  </div>
+                )}
+
+                {/* Toggle avance */}
+                {futures.length > 0 && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <div onClick={() => setShowAvance(v => !v)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', padding: '8px 0', userSelect: 'none' }}>
+                      <div style={{ width: '36px', height: '20px', borderRadius: '20px', background: showAvance ? '#1B3A6B' : '#CBD5E1', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+                        <div style={{ position: 'absolute', top: '2px', left: showAvance ? '18px' : '2px', width: '16px', height: '16px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+                      </div>
+                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Paiement en avance — {futures.length} échéance{futures.length > 1 ? 's' : ''} future{futures.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    {showAvance && (
+                      <div style={{ marginTop: '8px' }}>
+                        <div style={{ fontSize: '11px', color: '#92400E', padding: '6px 10px', background: '#FFFBEB', borderRadius: '6px', marginBottom: '8px', border: '1px solid #FDE68A' }}>
+                          ℹ️ Ces échéances ne sont pas encore dues. L'étudiant paie en avance.
+                        </div>
+                        {futures.map(item => renderRow(item, true))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Messages état */}
+                {dues.length === 0 && futures.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '16px', background: '#F0FDF4', borderRadius: '8px', color: '#16A34A', fontSize: '13px', fontWeight: '600', border: '1px solid #BBF7D0' }}>
+                    ✅ Scolarité entièrement apurée pour cet étudiant
+                  </div>
+                )}
+                {dues.length === 0 && futures.length > 0 && !showAvance && (
+                  <div style={{ textAlign: 'center', padding: '10px', background: '#F0FDF4', borderRadius: '8px', color: '#16A34A', fontSize: '12px', fontWeight: '600', border: '1px solid #BBF7D0' }}>
+                    ✅ Aucune échéance due — activez le toggle ci-dessus pour un paiement en avance
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── Récap montant calculé ── */}
+        {selectedAmounts.size > 0 && (
+          <div style={{ background: '#1B3A6B', color: '#fff', borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: '11px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {selectedAmounts.size} échéance{selectedAmounts.size > 1 ? 's' : ''} — montant à encaisser
+              </div>
+              <div style={{ fontSize: '24px', fontWeight: '800', marginTop: '2px' }}>
+                {montantTotal.toLocaleString('fr-FR')} FCFA
+              </div>
+            </div>
+            <span style={{ fontSize: '30px' }}>💳</span>
+          </div>
+        )}
+
+        {/* ── Mode, caisse, référence ── */}
+        {etudiant && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '8px' }}>
             <div>
               <label style={labelStyle}>Mode de paiement *</label>
-              <select name="mode_paiement" value={form.mode_paiement} onChange={handleChange} style={inputStyle}>
+              <select value={mode} onChange={e => setMode(e.target.value)} style={inputStyle}>
                 <option value="especes">💵 Espèces</option>
                 <option value="virement">🏦 Virement</option>
                 <option value="cheque">📝 Chèque</option>
                 <option value="wave">📱 Wave</option>
               </select>
             </div>
+            <div>
+              <label style={labelStyle}>Caisse *</label>
+              {userRole === 'raf' ? (
+                <select value={idCaisse} onChange={e => setIdCaisse(e.target.value)} style={inputStyle}>
+                  <option value="">Sélectionner</option>
+                  {caisses.filter(c => c.statut === 'active').map(c => (
+                    <option key={c.id} value={c.id}>{c.nom} — {c.solde_actuel.toLocaleString('fr-FR')} FCFA</option>
+                  ))}
+                </select>
+              ) : loadingCaisse ? (
+                <div style={{ ...inputStyle, color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  ⏳ Chargement de la caisse assignée…
+                </div>
+              ) : erreurCaisse ? (
+                <div style={{ padding: '9px 12px', background: '#FEF2F2', borderRadius: '8px', border: '1.5px solid #FCA5A5', color: '#DC2626', fontSize: '13px', fontWeight: '600' }}>
+                  ⚠️ {erreurCaisse}
+                </div>
+              ) : caisseAffectee ? (
+                <div style={{ padding: '9px 14px', background: '#F0FDF4', borderRadius: '8px', border: '1.5px solid #BBF7D0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '16px' }}>🏦</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#16A34A' }}>{caisseAffectee.nom}</div>
+                    <div style={{ fontSize: '11px', color: '#64748B' }}>Solde : {caisseAffectee.solde_actuel.toLocaleString('fr-FR')} FCFA</div>
+                  </div>
+                  <span style={{ background: '#DCFCE7', color: '#16A34A', padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>Assignée</span>
+                </div>
+              ) : null}
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <label style={labelStyle}>Référence de paiement</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 14px', background: '#F0F9FF', borderRadius: '8px', border: '1.5px solid #BAE6FD' }}>
+                <span style={{ fontSize: '14px' }}>🏷️</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '14px', color: '#0369A1', letterSpacing: '0.5px' }}>
+                  {prochainRef || '…'}
+                </span>
+                <span style={{ fontSize: '11px', color: '#64748B', marginLeft: 'auto' }}>Générée automatiquement</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <label style={labelStyle}>Caisse *</label>
-            <select name="id_caisse" value={form.id_caisse} onChange={handleChange} style={inputStyle}>
-              <option value="">Sélectionner une caisse</option>
-              {caisses.filter(c => c.statut === 'active').map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.nom} — Solde : {c.solde_actuel.toLocaleString('fr-FR')} FCFA
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>Motif</label>
-            <input name="motif" value={form.motif} onChange={handleChange}
-              placeholder="Ex: Frais de scolarité Semestre 1" style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Référence / N° reçu</label>
-            <input name="reference" value={form.reference} onChange={handleChange}
-              placeholder="Ex: VIR-2026-001" style={inputStyle} />
-          </div>
-        </div>
+        )}
 
-        <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'flex-end' }}>
           <button onClick={onClose}
-            style={{ padding: '10px 20px', border: '1.5px solid #E2E8F0', borderRadius: '8px',
-              background: '#fff', cursor: 'pointer', fontSize: '14px', color: '#64748B' }}>
+            style={{ padding: '10px 20px', border: '1.5px solid #E2E8F0', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', color: '#64748B' }}>
             Annuler
           </button>
-          <button onClick={handleSubmit} disabled={loading}
-            style={{ padding: '10px 24px', background: loading ? '#94A3B8' : '#1B3A6B',
-              color: '#fff', border: 'none', borderRadius: '8px',
-              cursor: loading ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '600' }}>
-            {loading ? '⏳ Enregistrement...' : '✅ Enregistrer'}
+          <button onClick={handleSubmit} disabled={!canSubmit || loading}
+            style={{ padding: '10px 24px', background: (!canSubmit || loading) ? '#94A3B8' : '#16A34A', color: '#fff', border: 'none', borderRadius: '8px', cursor: (!canSubmit || loading) ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '600' }}>
+            {loading ? '⏳ Enregistrement...' : canSubmit ? `✅ Encaisser ${montantTotal.toLocaleString('fr-FR')} FCFA` : '✅ Enregistrer'}
           </button>
         </div>
       </div>
@@ -263,7 +551,12 @@ export default function ModalEcheancier({ etudiant, caisses, etudiants, onClose,
   const statuts     = calculerStatuts(echeancier, totalPaye)
   const resteAPayer = Math.max(0, echeancier.totalAnnuel - totalPaye)
 
-  const handleRecu = async (id) => {
+  const allItems     = [...echeancier.inscription, ...echeancier.scolarite, ...echeancier.encadrement]
+  const itemsDus     = allItems.filter(i => statuts[i.key] === 'du')
+  const montantDuNow = itemsDus.reduce((s, i) => s + i.montant, 0)
+  const prochainItem = allItems.filter(i => statuts[i.key] === 'attente').sort((a, b) => a.date - b.date)[0]
+
+  const handleRecu = async (id, ref) => {
     try {
       const res = await fetch(`${API}/paiements/${id}/recu`, { headers: getHeaders() })
       if (!res.ok) { alert('Erreur génération du reçu'); return }
@@ -271,7 +564,7 @@ export default function ModalEcheancier({ etudiant, caisses, etudiants, onClose,
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href = url; a.target = '_blank'
-      a.download = `recu_FT${String(id).padStart(5, '0')}.pdf`
+      a.download = `recu_${ref || 'FT-' + String(id).padStart(5, '0')}.pdf`
       document.body.appendChild(a); a.click()
       document.body.removeChild(a); URL.revokeObjectURL(url)
     } catch { alert('Erreur de connexion') }
@@ -364,43 +657,82 @@ export default function ModalEcheancier({ etudiant, caisses, etudiants, onClose,
             ) : (
               <>
                 {/* KPI cards */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '28px' }}>
-                  <div style={{ background: '#EFF6FF', borderRadius: '12px', padding: '18px 20px' }}>
-                    <div style={{ fontSize: '10px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Total annuel attendu</div>
-                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#1B3A6B' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '20px' }}>
+                  <div style={{ background: '#EFF6FF', borderRadius: '12px', padding: '16px 16px' }}>
+                    <div style={{ fontSize: '10px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Total annuel</div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#1B3A6B' }}>
                       {echeancier.totalAnnuel.toLocaleString('fr-FR')}
                       <span style={{ fontSize: '11px', fontWeight: '600' }}> FCFA</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
-                      {niveau} · {echeancier.fraisMensuel.toLocaleString('fr-FR')} FCFA/mois
+                      {niveau} · {echeancier.fraisMensuel.toLocaleString('fr-FR')}/mois
                     </div>
                   </div>
-                  <div style={{ background: '#F0FDF4', borderRadius: '12px', padding: '18px 20px' }}>
+
+                  <div style={{ background: '#F0FDF4', borderRadius: '12px', padding: '16px 16px' }}>
                     <div style={{ fontSize: '10px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Montant payé</div>
-                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#16A34A' }}>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: '#16A34A' }}>
                       {totalPaye.toLocaleString('fr-FR')}
                       <span style={{ fontSize: '11px', fontWeight: '600' }}> FCFA</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
-                      {paiementsEtu.length} paiement{paiementsEtu.length !== 1 ? 's' : ''} enregistré{paiementsEtu.length !== 1 ? 's' : ''}
+                      {paiementsEtu.length} paiement{paiementsEtu.length !== 1 ? 's' : ''}
                     </div>
                   </div>
-                  <div style={{ background: resteAPayer > 0 ? '#FEF2F2' : '#F0FDF4', borderRadius: '12px', padding: '18px 20px' }}>
-                    <div style={{ fontSize: '10px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Reste à payer</div>
-                    <div style={{ fontSize: '20px', fontWeight: '800', color: resteAPayer > 0 ? '#DC2626' : '#16A34A' }}>
-                      {resteAPayer.toLocaleString('fr-FR')}
+
+                  <div style={{ background: montantDuNow > 0 ? '#FEF2F2' : '#F0FDF4', borderRadius: '12px', padding: '16px 16px', border: montantDuNow > 0 ? '2px solid #FCA5A5' : '2px solid transparent' }}>
+                    <div style={{ fontSize: '10px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Dû maintenant</div>
+                    <div style={{ fontSize: '16px', fontWeight: '800', color: montantDuNow > 0 ? '#DC2626' : '#16A34A' }}>
+                      {montantDuNow.toLocaleString('fr-FR')}
                       <span style={{ fontSize: '11px', fontWeight: '600' }}> FCFA</span>
                     </div>
                     <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
-                      {resteAPayer === 0 ? '✅ Scolarité apurée' : 'Solde restant dû'}
+                      {montantDuNow === 0 ? '✅ À jour' : `${itemsDus.length} versement${itemsDus.length > 1 ? 's' : ''} en retard`}
                     </div>
                   </div>
+
+                  <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '16px 16px' }}>
+                    <div style={{ fontSize: '10px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Prochaine échéance</div>
+                    {prochainItem ? (
+                      <>
+                        <div style={{ fontSize: '16px', fontWeight: '800', color: '#1B3A6B' }}>
+                          {prochainItem.montant.toLocaleString('fr-FR')}
+                          <span style={{ fontSize: '11px', fontWeight: '600' }}> FCFA</span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '4px' }}>
+                          📅 {fmtDate(prochainItem.date)}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '16px', fontWeight: '800', color: resteAPayer === 0 ? '#16A34A' : '#94A3B8' }}>—</div>
+                        <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>
+                          {resteAPayer === 0
+                            ? '✅ Scolarité apurée'
+                            : montantDuNow > 0
+                              ? 'Toutes les échéances sont passées'
+                              : 'Aucune échéance à venir'}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Reste total (sous les KPI) */}
+                <div style={{ background: resteAPayer > 0 ? '#FFFBEB' : '#F0FDF4', borderRadius: '10px', padding: '12px 18px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: `1px solid ${resteAPayer > 0 ? '#FDE68A' : '#BBF7D0'}` }}>
+                  <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '500' }}>
+                    Reste total à payer sur l'année
+                  </span>
+                  <span style={{ fontSize: '16px', fontWeight: '800', color: resteAPayer > 0 ? '#B45309' : '#16A34A' }}>
+                    {resteAPayer.toLocaleString('fr-FR')} FCFA
+                    {resteAPayer === 0 && <span style={{ fontSize: '12px', marginLeft: '8px' }}>— Scolarité apurée ✅</span>}
+                  </span>
                 </div>
 
                 {/* Sections tableau */}
                 {renderSection("🟦 Droits d'inscription", echeancier.inscription, '#1B3A6B', '#EFF6FF', echeancier.totalInscription)}
                 {renderSection('🟧 Frais de scolarité', echeancier.scolarite, '#EA580C', '#FFF7ED', echeancier.totalScolarite)}
-                {niveau === 'L3' && renderSection('🟣 Encadrement & Soutenance', echeancier.encadrement, '#7C3AED', '#F5F3FF', echeancier.totalEncadrement)}
+                {(niveau === 'L3' || niveau === 'M2') && renderSection('🟣 Encadrement & Soutenance', echeancier.encadrement, '#7C3AED', '#F5F3FF', echeancier.totalEncadrement)}
 
                 {/* Footer */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #E2E8F0' }}>
@@ -429,9 +761,9 @@ export default function ModalEcheancier({ etudiant, caisses, etudiants, onClose,
 
       {showPaiement && (
         <ModalPaiement
-          etudiants={etudiants}
           caisses={caisses}
           defaultEtudiant={etudiant}
+          paiementsInitiaux={paiementsEtu}
           zIndex={2000}
           onClose={() => setShowPaiement(false)}
           onRecu={handleRecu}

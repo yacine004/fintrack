@@ -1,10 +1,11 @@
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, make_response
 from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
 from extensions import db
-from models import Paiement, Etudiant, Caisse
+from models import Paiement, Etudiant, Caisse, Notification, Utilisateur, ConfigApp, SessionCaisse
 from datetime import datetime
 from routes.audit import log_action
+from utils import generer_reference, prochain_numero_reference
 import io
 
 paiements_bp = Blueprint('paiements', __name__)
@@ -29,6 +30,13 @@ def auth_required(fn):
     return wrapper
 
 
+@paiements_bp.route('/prochain-numero', methods=['GET'])
+@auth_required
+def prochain_numero():
+    """Retourne la prochaine référence sans l'incrémenter (lecture seule)."""
+    return jsonify({'reference': prochain_numero_reference()})
+
+
 # ── ENREGISTRER un paiement ───────────────────────────────────────────────────
 @paiements_bp.route('', methods=['POST'])
 @auth_required
@@ -40,7 +48,6 @@ def creer():
     montant       = data.get('montant')
     mode_paiement = data.get('mode_paiement', '').strip()
     motif         = data.get('motif', '').strip()
-    reference     = data.get('reference', '').strip()
 
     # Validations
     if not all([id_etudiant, id_caisse, montant, mode_paiement]):
@@ -70,24 +77,46 @@ def creer():
 
     # Transaction atomique : créer le paiement + mettre à jour le solde
     try:
+        identity = get_jwt().get('user', {})
+        reference_auto = generer_reference()
+
         paiement = Paiement(
             id_etudiant=id_etudiant,
             id_caisse=id_caisse,
+            id_createur=identity.get('id'),
             montant=montant,
             mode_paiement=mode_paiement,
             motif=motif or None,
-            reference=reference or None
+            reference=reference_auto,
+            annee_academique=etudiant.annee_academique
         )
         db.session.add(paiement)
 
         # Mise à jour solde caisse
         caisse.solde_actuel = float(caisse.solde_actuel) + montant
 
+        # Mise à jour session du jour si ouverte
+        from datetime import date as _date
+        session_jour = db.session.query(SessionCaisse).filter_by(
+            id_caisse=id_caisse, statut='ouverte'
+        ).filter(SessionCaisse.date_session == _date.today()).first()
+        if session_jour:
+            session_jour.total_entrees = float(session_jour.total_entrees) + montant
+
+        # Notification pour tous les RAFs
+        rafs = db.session.query(Utilisateur).filter_by(role='raf', actif=True).all()
+        for raf in rafs:
+            db.session.add(Notification(
+                id_utilisateur=raf.id_utilisateur,
+                type='paiement',
+                message=f"Paiement reçu : {etudiant.prenom} {etudiant.nom} — {montant:,.0f} FCFA ({mode_paiement})",
+                priorite='normale'
+            ))
+
         db.session.commit()
 
-        identity = get_jwt().get('user', {})
         log_action(identity.get('id'), 'CREATE', 'Paiement', paiement.id_paiement,
-                   {'montant': montant, 'etudiant_id': id_etudiant, 'caisse': caisse.nom, 'mode': mode_paiement})
+                   {'montant': montant, 'etudiant_id': id_etudiant, 'caisse': caisse.nom, 'mode': mode_paiement, 'reference': paiement.reference})
         db.session.commit()
 
         return jsonify({
@@ -109,6 +138,7 @@ def lister():
     id_etudiant = request.args.get('etudiant_id', '').strip()
     id_caisse   = request.args.get('caisse_id', '').strip()
     mode        = request.args.get('mode', '').strip()
+    annee       = request.args.get('annee', '').strip()
     date_debut  = request.args.get('date_debut', '').strip()
     date_fin    = request.args.get('date_fin', '').strip()
     page        = int(request.args.get('page', 1))
@@ -118,6 +148,8 @@ def lister():
 
     if id_etudiant:
         query = query.filter(Paiement.id_etudiant == int(id_etudiant))
+    if annee:
+        query = query.filter(Paiement.annee_academique == annee)
     if id_caisse:
         query = query.filter(Paiement.id_caisse == int(id_caisse))
     if mode in ('especes', 'virement', 'cheque', 'wave'):
@@ -245,7 +277,7 @@ def generer_recu(pid):
         etudiant = paiement.etudiant
         caisse   = paiement.caisse
         montant  = float(paiement.montant)
-        num_recu = f'FT-{paiement.id_paiement:05d}'
+        num_recu = paiement.reference or f'FT-{paiement.id_paiement:05d}'
         date_str = paiement.date_paiement.strftime('%d/%m/%Y')
         heure_str = paiement.date_paiement.strftime('%H:%M')
         mode_label = MODE_LABELS.get(paiement.mode_paiement, paiement.mode_paiement)
@@ -302,17 +334,20 @@ def generer_recu(pid):
         et_fil    = f'{etudiant.classe} - {etudiant.filiere}' if etudiant else 'N/A'
         et_annee  = etudiant.annee_academique if etudiant else '-'
 
+        # Styles Paragraph pour les cellules (wrapping automatique)
+        _lbl = ParagraphStyle('elbl', fontSize=9, fontName='Helvetica-Bold',
+                              textColor=BLUE, leading=12)
+        _val = ParagraphStyle('eval', fontSize=9, leading=12)
+
         etu_data = [
-            ['Nom et Prénom',      et_nom,   'Matricule',       et_mat],
-            ['Filière / Classe',   et_fil,   'Année académique', et_annee],
+            [Paragraph('Nom et Prénom',      _lbl), Paragraph(et_nom,    _val),
+             Paragraph('Matricule',          _lbl), Paragraph(et_mat,    _val)],
+            [Paragraph('Filière / Classe',   _lbl), Paragraph(et_fil,    _val),
+             Paragraph('Année académique',   _lbl), Paragraph(et_annee,  _val)],
         ]
-        etu_table = Table(etu_data, colWidths=[3.5*cm, 5.5*cm, 3.5*cm, 4.5*cm])
+        # Col 1 (valeur filière) élargie à 6.5 cm pour absorber les noms longs
+        etu_table = Table(etu_data, colWidths=[3.5*cm, 6.5*cm, 3.5*cm, 3.5*cm])
         etu_table.setStyle(TableStyle([
-            ('FONTNAME',  (0,0), (0,-1), 'Helvetica-Bold'),
-            ('FONTNAME',  (2,0), (2,-1), 'Helvetica-Bold'),
-            ('FONTSIZE',  (0,0), (-1,-1), 9),
-            ('TEXTCOLOR', (0,0), (0,-1), BLUE),
-            ('TEXTCOLOR', (2,0), (2,-1), BLUE),
             ('BACKGROUND',(0,0), (0,-1), LGRAY),
             ('BACKGROUND',(2,0), (2,-1), LGRAY),
             ('GRID',      (0,0), (-1,-1), 0.5, BGRAY),
@@ -343,14 +378,27 @@ def generer_recu(pid):
                 ParagraphStyle('mf', fontSize=26, textColor=GREEN,
                                fontName='Helvetica-Bold', alignment=TA_CENTER))],
             [Paragraph(f'<i>En lettres : {montant_lettres}</i>',
-                ParagraphStyle('ml', fontSize=9, textColor=GRAY, alignment=TA_CENTER))],
+                ParagraphStyle('ml', fontSize=9, textColor=GRAY, alignment=TA_CENTER,
+                               leading=13))],
         ]
-        mt_table = Table(montant_data, colWidths=[17*cm])
+        mt_table = Table(montant_data, colWidths=[17*cm], rowHeights=[1.8*cm, None])
         mt_table.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F0FDF4')),
-            ('BOX',        (0,0), (-1,-1), 1.5, GREEN),
-            ('PADDING',    (0,0), (-1,-1), 12),
-            ('TOPPADDING', (0,0), (0,0),   14),
+            ('BACKGROUND',   (0,0), (-1,-1), colors.HexColor('#F0FDF4')),
+            ('BOX',          (0,0), (-1,-1), 1.5, GREEN),
+            # Ligne 1 : le grand montant
+            ('TOPPADDING',    (0,0), (0,0), 14),
+            ('BOTTOMPADDING', (0,0), (0,0),  6),
+            ('LEFTPADDING',   (0,0), (0,0), 12),
+            ('RIGHTPADDING',  (0,0), (0,0), 12),
+            ('VALIGN',        (0,0), (0,0), 'MIDDLE'),
+            # Ligne 2 : en lettres
+            ('TOPPADDING',    (0,1), (0,1),  8),
+            ('BOTTOMPADDING', (0,1), (0,1), 14),
+            ('LEFTPADDING',   (0,1), (0,1), 12),
+            ('RIGHTPADDING',  (0,1), (0,1), 12),
+            ('VALIGN',        (0,1), (0,1), 'TOP'),
+            # Séparateur visuel entre les deux lignes
+            ('LINEABOVE',     (0,1), (0,1), 0.5, colors.HexColor('#BBF7D0')),
         ]))
         elems.append(mt_table)
         elems.append(Spacer(1, 0.5*cm))
@@ -360,18 +408,16 @@ def generer_recu(pid):
             ParagraphStyle('sh3', fontSize=9, textColor=BLUE,
                            fontName='Helvetica-Bold', spaceAfter=4)))
         ref = paiement.reference or '-'
+        createur = db.session.get(Utilisateur, paiement.id_createur) if paiement.id_createur else None
+        createur_nom = f"{createur.civilite or 'M.'} {createur.nom}" if createur else 'FinTrack / Comptabilité'
         det_data = [
-            ['Mode de paiement', mode_label, 'Référence', ref],
-            ['Caisse',           caisse.nom if caisse else '-',
-             'Enregistré par',   'FinTrack / Comptabilité'],
+            [Paragraph('Mode de paiement', _lbl), Paragraph(mode_label,              _val),
+             Paragraph('Référence',         _lbl), Paragraph(ref,                     _val)],
+            [Paragraph('Caisse',            _lbl), Paragraph(caisse.nom if caisse else '-', _val),
+             Paragraph('Enregistré par',    _lbl), Paragraph(createur_nom,            _val)],
         ]
-        det_table = Table(det_data, colWidths=[3.5*cm, 5.5*cm, 3.5*cm, 4.5*cm])
+        det_table = Table(det_data, colWidths=[3.5*cm, 6.5*cm, 3.5*cm, 3.5*cm])
         det_table.setStyle(TableStyle([
-            ('FONTNAME',  (0,0), (0,-1), 'Helvetica-Bold'),
-            ('FONTNAME',  (2,0), (2,-1), 'Helvetica-Bold'),
-            ('FONTSIZE',  (0,0), (-1,-1), 9),
-            ('TEXTCOLOR', (0,0), (0,-1), BLUE),
-            ('TEXTCOLOR', (2,0), (2,-1), BLUE),
             ('BACKGROUND',(0,0), (0,-1), LGRAY),
             ('BACKGROUND',(2,0), (2,-1), LGRAY),
             ('GRID',      (0,0), (-1,-1), 0.5, BGRAY),
@@ -425,14 +471,12 @@ def generer_recu(pid):
         ))
 
         doc.build(elems)
-        buffer.seek(0)
-
-        return send_file(
-            buffer,
-            mimetype='application/pdf',
-            as_attachment=False,
-            download_name=f'recu_{num_recu}.pdf'
-        )
+        pdf_bytes = buffer.getvalue()
+        resp = make_response(pdf_bytes)
+        resp.headers['Content-Type']        = 'application/pdf'
+        resp.headers['Content-Disposition'] = f'inline; filename="recu_{num_recu}.pdf"'
+        resp.headers['Content-Length']      = len(pdf_bytes)
+        return resp
 
     except ImportError:
         return jsonify({'message': 'ReportLab non installé. Exécutez : pip install reportlab'}), 500

@@ -2,24 +2,34 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useIsMobile } from '../hooks/useIsMobile'
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+const H = () => ({ Authorization: `Bearer ${localStorage.getItem('token')}` })
+
 const menuRAF = [
   { icon: '📊', label: 'Tableau de bord',  path: '/raf/dashboard' },
   { icon: '👥', label: 'Utilisateurs',     path: '/raf/utilisateurs' },
   { icon: '🏦', label: 'Caisses',          path: '/raf/caisses' },
   { icon: '🎓', label: 'Étudiants',        path: '/raf/etudiants' },
+  { icon: '📝', label: 'Inscriptions',     path: '/raf/inscriptions' },
   { icon: '💳', label: 'Paiements',        path: '/raf/paiements' },
+  { icon: '🧾', label: 'Frais annexes',    path: '/raf/frais-annexes' },
   { icon: '💰', label: 'Dépenses',         path: '/raf/depenses' },
   { icon: '📋', label: 'Budget',           path: '/raf/budgets' },
   { icon: '📈', label: 'Rapports',         path: '/raf/rapports' },
+  { icon: '🚨', label: 'Alertes',           path: '/raf/alertes' },
+  { icon: '🎓', label: 'Autorisations',    path: '/raf/autorisations' },
   { icon: '💬', label: 'Messagerie',       path: '/raf/messagerie' },
   { icon: '🔍', label: "Journal d'audit",  path: '/raf/audit' },
   { icon: '🔔', label: 'Notifications',    path: '/raf/notifications' },
+  { icon: '⚙️', label: 'Paramétrage',      path: '/raf/parametrage' },
 ]
 
 const menuComptable = [
   { icon: '📊', label: 'Tableau de bord',  path: '/comptable/dashboard' },
+  { icon: '🏦', label: 'Caisses',          path: '/comptable/caisses' },
   { icon: '🎓', label: 'Étudiants',        path: '/comptable/etudiants' },
   { icon: '💳', label: 'Paiements',        path: '/comptable/paiements' },
+  { icon: '🧾', label: 'Frais annexes',    path: '/comptable/frais-annexes' },
   { icon: '💰', label: 'Dépenses',         path: '/comptable/depenses' },
   { icon: '💬', label: 'Messagerie',       path: '/comptable/messagerie' },
   { icon: '🔔', label: 'Notifications',    path: '/comptable/notifications' },
@@ -34,8 +44,27 @@ export default function Sidebar() {
   const isMobile   = useIsMobile()
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
+  const [nbMessages, setNbMessages]   = useState(0)
+  const [nbNotifs,   setNbNotifs]     = useState(0)
 
   const logout = () => { localStorage.clear(); navigate('/') }
+
+  // Compteurs non lus — rechargés à chaque navigation + toutes les 30s
+  useEffect(() => {
+    const charger = async () => {
+      try {
+        const [rMsg, rNotif] = await Promise.all([
+          fetch(`${API}/messages/recus?limit=1`, { headers: H() }),
+          fetch(`${API}/notifications?limit=1`,  { headers: H() }),
+        ])
+        if (rMsg.ok)   { const d = await rMsg.json();   setNbMessages(d.nb_non_lus  || 0) }
+        if (rNotif.ok) { const d = await rNotif.json(); setNbNotifs(d.nb_non_lues   || 0) }
+      } catch { /* réseau indisponible */ }
+    }
+    charger()
+    const id = setInterval(charger, 30000)
+    return () => clearInterval(id)
+  }, [location.pathname])
 
   // Close drawer on navigation
   useEffect(() => { setOpen(false) }, [location.pathname])
@@ -70,9 +99,23 @@ export default function Sidebar() {
     return () => { document.body.style.overflow = '' }
   }, [isMobile, open])
 
+  // Badge rouge générique
+  const Badge = ({ count }) => count > 0 ? (
+    <span style={{
+      marginLeft: 'auto', background: '#EF4444', color: '#fff',
+      borderRadius: '10px', fontSize: '10px', fontWeight: '700',
+      padding: '1px 6px', minWidth: '18px', textAlign: 'center', lineHeight: '16px',
+    }}>
+      {count > 99 ? '99+' : count}
+    </span>
+  ) : null
+
   // Shared: menu item list
   const menuItems = menu.map((item) => {
-    const isActive = location.pathname === item.path
+    const isActive  = location.pathname === item.path
+    const isMsg     = item.path.endsWith('/messagerie')
+    const isNotif   = item.path.endsWith('/notifications')
+    const badgeCount = isMsg ? nbMessages : isNotif ? nbNotifs : 0
     return (
       <div key={item.path} onClick={() => navigate(item.path)}
         style={{
@@ -85,7 +128,8 @@ export default function Sidebar() {
           fontSize: '13px', fontWeight: isActive ? '600' : '400',
         }}>
         <span style={{ fontSize: '15px' }}>{item.icon}</span>
-        {item.label}
+        <span style={{ flex: 1 }}>{item.label}</span>
+        <Badge count={badgeCount} />
       </div>
     )
   })

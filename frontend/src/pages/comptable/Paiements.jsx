@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Sidebar from '../../components/Sidebar'
+import { ModalPaiement } from '../../components/ModalEcheancier'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const getHeaders = () => ({
@@ -7,156 +8,23 @@ const getHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('token')}`
 })
 
-const MODE_COLORS = {
-  especes:  { bg: '#F0FDF4', color: '#16A34A', label: '💵 Espèces' },
-  virement: { bg: '#EFF6FF', color: '#2563EB', label: '🏦 Virement' },
-  cheque:   { bg: '#FFF7ED', color: '#EA580C', label: '📝 Chèque' },
-  wave:     { bg: '#F5F3FF', color: '#7C3AED', label: '📱 Wave' },
+const MODE_INFO = {
+  especes:  { bg: '#F0FDF4', color: '#16A34A', label: 'Espèces',  dot: '#16A34A' },
+  virement: { bg: '#EFF6FF', color: '#2563EB', label: 'Virement', dot: '#2563EB' },
+  cheque:   { bg: '#FFF7ED', color: '#EA580C', label: 'Chèque',   dot: '#EA580C' },
+  wave:     { bg: '#F5F3FF', color: '#7C3AED', label: 'Wave',     dot: '#7C3AED' },
 }
 
-// ── Modal Paiement Comptable ──────────────────────────────────────────────────
-function ModalPaiement({ etudiants, caisses, onClose, onSave }) {
-  const [form, setForm] = useState({
-    id_etudiant: '', id_caisse: '', montant: '',
-    mode_paiement: 'especes', motif: '', reference: ''
-  })
-  const [erreur, setErreur]   = useState('')
-  const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(null)
+const fmt = n => Number(n || 0).toLocaleString('fr-FR')
 
-  const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }))
-
-  const handleSubmit = async () => {
-    if (!form.id_etudiant || !form.id_caisse || !form.montant || !form.mode_paiement) {
-      setErreur('Étudiant, caisse, montant et mode sont obligatoires')
-      return
-    }
-    setLoading(true)
-    setErreur('')
-    try {
-      const res  = await fetch(`${API}/paiements`, {
-        method: 'POST', headers: getHeaders(),
-        body: JSON.stringify({ ...form, montant: parseFloat(form.montant) })
-      })
-      const data = await res.json()
-      if (!res.ok) { setErreur(data.message); return }
-      setSuccess(data)
-    } catch { setErreur('Erreur de connexion') }
-    finally { setLoading(false) }
-  }
-
-  const inputStyle = {
-    width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0',
-    borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box'
-  }
-  const labelStyle = {
-    display: 'block', fontSize: '12px', fontWeight: '600',
-    color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px'
-  }
-
-  if (success) {
-    return (
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-        <div style={{ background: '#fff', borderRadius: '16px', padding: '40px',
-          width: '400px', textAlign: 'center' }}>
-          <div style={{ fontSize: '60px', marginBottom: '16px' }}>✅</div>
-          <h2 style={{ color: '#16A34A', fontSize: '20px', margin: '0 0 16px' }}>Paiement enregistré !</h2>
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button onClick={() => handleRecu(success.paiement.id)}
-              style={{ padding: '10px 18px', background: '#1B3A6B', color: '#fff',
-                border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
-              🖨️ Reçu PDF
-            </button>
-            <button onClick={() => { onSave(); onClose() }}
-              style={{ padding: '10px 18px', background: '#F1F5F9', color: '#374151',
-                border: '1.5px solid #E2E8F0', borderRadius: '8px', cursor: 'pointer', fontSize: '14px' }}>
-              Fermer
-            </button>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-      <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', width: '520px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ margin: 0, fontSize: '18px', color: '#1B3A6B', fontWeight: '700' }}>💳 Enregistrer un paiement</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>✕</button>
-        </div>
-
-        {erreur && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px',
-            padding: '10px 14px', marginBottom: '16px', color: '#DC2626', fontSize: '13px' }}>
-            ⚠️ {erreur}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <label style={labelStyle}>Étudiant *</label>
-            <select name="id_etudiant" value={form.id_etudiant} onChange={handleChange} style={inputStyle}>
-              <option value="">Sélectionner un étudiant</option>
-              {etudiants.map(e => (
-                <option key={e.id} value={e.id}>{e.matricule} — {e.prenom} {e.nom}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-            <div>
-              <label style={labelStyle}>Montant (FCFA) *</label>
-              <input name="montant" type="number" value={form.montant} onChange={handleChange}
-                placeholder="150000" min="0" style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Mode *</label>
-              <select name="mode_paiement" value={form.mode_paiement} onChange={handleChange} style={inputStyle}>
-                <option value="especes">💵 Espèces</option>
-                <option value="virement">🏦 Virement</option>
-                <option value="cheque">📝 Chèque</option>
-                <option value="wave">📱 Wave</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label style={labelStyle}>Caisse *</label>
-            <select name="id_caisse" value={form.id_caisse} onChange={handleChange} style={inputStyle}>
-              <option value="">Sélectionner une caisse</option>
-              {caisses.filter(c => c.statut === 'active').map(c => (
-                <option key={c.id} value={c.id}>{c.nom}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>Motif</label>
-            <input name="motif" value={form.motif} onChange={handleChange}
-              placeholder="Frais de scolarité S1" style={inputStyle} />
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: '12px', marginTop: '20px', justifyContent: 'flex-end' }}>
-          <button onClick={onClose}
-            style={{ padding: '10px 20px', border: '1.5px solid #E2E8F0', borderRadius: '8px',
-              background: '#fff', cursor: 'pointer', fontSize: '14px', color: '#64748B' }}>Annuler</button>
-          <button onClick={handleSubmit} disabled={loading}
-            style={{ padding: '10px 24px', background: loading ? '#94A3B8' : '#16A34A',
-              color: '#fff', border: 'none', borderRadius: '8px',
-              cursor: loading ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '600' }}>
-            {loading ? '⏳...' : '✅ Enregistrer'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+const inp = {
+  padding: '9px 14px', border: '1.5px solid #E2E8F0', borderRadius: '8px',
+  fontSize: '13px', outline: 'none', background: '#fff', fontFamily: 'Inter, sans-serif',
 }
 
 export default function ComptablePaiements() {
   const [paiements, setPaiements] = useState([])
   const [kpis, setKpis]           = useState({ total_paiements: 0, total_encaisse: 0 })
-  const [etudiants, setEtudiants] = useState([])
   const [caisses, setCaisses]     = useState([])
   const [loading, setLoading]     = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -177,22 +45,18 @@ export default function ComptablePaiements() {
     finally { setLoading(false) }
   }, [page, filtreMode])
 
-  const fetchSelectData = async () => {
+  const fetchCaisses = useCallback(async () => {
     try {
-      const [resE, resC] = await Promise.all([
-        fetch(`${API}/etudiants?limit=100&statut=actif`, { headers: getHeaders() }),
-        fetch(`${API}/caisses`, { headers: getHeaders() })
-      ])
-      const [dataE, dataC] = await Promise.all([resE.json(), resC.json()])
-      if (resE.ok) setEtudiants(dataE.etudiants)
-      if (resC.ok) setCaisses(dataC.caisses)
+      const res  = await fetch(`${API}/caisses`, { headers: getHeaders() })
+      const data = await res.json()
+      if (res.ok) setCaisses(data.caisses || [])
     } catch {}
-  }
+  }, [])
 
   useEffect(() => { fetchPaiements() }, [fetchPaiements])
-  useEffect(() => { fetchSelectData() }, [])
+  useEffect(() => { fetchCaisses() },   [fetchCaisses])
 
-  const handleRecu = async (id) => {
+  const handleRecu = async (id, ref) => {
     try {
       const res = await fetch(`${API}/paiements/${id}/recu`, { headers: getHeaders() })
       if (!res.ok) { alert('Erreur génération du reçu'); return }
@@ -200,113 +64,185 @@ export default function ComptablePaiements() {
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href = url; a.target = '_blank'
-      a.download = `recu_FT${String(id).padStart(5,'0')}.pdf`
+      a.download = `recu_${ref || 'FT-' + String(id).padStart(5,'0')}.pdf`
       document.body.appendChild(a); a.click()
       document.body.removeChild(a); URL.revokeObjectURL(url)
     } catch { alert('Erreur de connexion') }
   }
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#F1F5F9', fontFamily: 'Inter, Arial, sans-serif' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F1F5F9', fontFamily: 'Inter, sans-serif' }}>
       <Sidebar />
-      <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
-          <div>
-            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: '800', color: '#1B3A6B' }}>💳 Paiements</h1>
-            <p style={{ margin: '4px 0 0', color: '#64748B', fontSize: '14px' }}>{total} paiements enregistrés</p>
-          </div>
-          <button onClick={() => setShowModal(true)}
-            style={{ padding: '11px 22px', background: '#16A34A', color: '#fff',
-              border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
-            ＋ Enregistrer un paiement
-          </button>
-        </div>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
 
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
-          <div style={{ background: '#EFF6FF', borderRadius: '12px', padding: '20px 24px', flex: 1 }}>
-            <div style={{ fontSize: '28px', fontWeight: '800', color: '#1B3A6B' }}>{kpis.total_paiements}</div>
-            <div style={{ fontSize: '13px', color: '#64748B' }}>Total paiements</div>
-          </div>
-          <div style={{ background: '#F0FDF4', borderRadius: '12px', padding: '20px 24px', flex: 1 }}>
-            <div style={{ fontSize: '22px', fontWeight: '800', color: '#16A34A' }}>
-              {kpis.total_encaisse?.toLocaleString('fr-FR')} FCFA
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0F766E 0%, #0D9488 50%, #14B8A6 100%)',
+          padding: '28px 32px 24px', color: '#fff', position: 'relative', overflow: 'hidden'
+        }}>
+          <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '180px', height: '180px',
+            borderRadius: '50%', background: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '800', color: '#fff' }}>Paiements</h1>
+              <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.65)' }}>
+                {total} paiement{total !== 1 ? 's' : ''} enregistré{total !== 1 ? 's' : ''}
+              </p>
             </div>
-            <div style={{ fontSize: '13px', color: '#64748B' }}>Total encaissé</div>
+            <button onClick={() => setShowModal(true)}
+              style={{ padding: '9px 20px', background: '#fff', color: '#0F766E',
+                border: 'none', borderRadius: '9px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}>
+              + Enregistrer un paiement
+            </button>
           </div>
         </div>
 
-        <div style={{ background: '#fff', borderRadius: '12px', padding: '14px 20px', marginBottom: '20px', display: 'flex', gap: '12px' }}>
-          <select value={filtreMode} onChange={e => { setFiltreMode(e.target.value); setPage(1) }}
-            style={{ padding: '9px 14px', border: '1.5px solid #E2E8F0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}>
-            <option value="">Tous les modes</option>
-            <option value="especes">💵 Espèces</option>
-            <option value="virement">🏦 Virement</option>
-            <option value="cheque">📝 Chèque</option>
-            <option value="wave">📱 Wave</option>
-          </select>
-        </div>
+        <div className="ft-page" style={{ padding: '28px 32px' }}>
 
-        <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden' }}>
-          {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>⏳ Chargement...</div>
-          ) : paiements.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>Aucun paiement</div>
-          ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#F8FAFC' }}>
-                  {['N°', 'Étudiant', 'Montant', 'Mode', 'Motif', 'Date', 'Reçu'].map(h => (
-                    <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px',
-                      fontWeight: '700', color: '#64748B', textTransform: 'uppercase',
-                      borderBottom: '1px solid #E2E8F0' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {paiements.map((p, i) => {
-                  const modeInfo = MODE_COLORS[p.mode_paiement] || MODE_COLORS.especes
-                  return (
-                    <tr key={p.id} style={{ background: i % 2 === 0 ? '#fff' : '#FAFBFC', borderBottom: '1px solid #F1F5F9' }}>
-                      <td style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '700', color: '#1B3A6B' }}>
-                        FT-{String(p.id).padStart(5, '0')}
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#1E293B' }}>{p.etudiant}</td>
-                      <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '800', color: '#16A34A' }}>
-                        {parseFloat(p.montant).toLocaleString('fr-FR')} FCFA
-                      </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ background: modeInfo.bg, color: modeInfo.color,
-                          padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
-                          {modeInfo.label}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', fontSize: '13px', color: '#64748B' }}>{p.motif || '—'}</td>
-                      <td style={{ padding: '12px 16px', fontSize: '12px', color: '#94A3B8' }}>{p.date_paiement}</td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <button onClick={() => handleRecu(p.id)}
-                          style={{ padding: '5px 10px', background: '#EFF6FF', color: '#2563EB',
-                            border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px' }}>
-                          🖨️
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-          {nbPages > 1 && (
-            <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '16px', borderTop: '1px solid #F1F5F9' }}>
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                style={{ padding: '6px 14px', border: '1.5px solid #E2E8F0', borderRadius: '6px', background: '#fff', cursor: page === 1 ? 'not-allowed' : 'pointer', fontSize: '13px' }}>← Préc.</button>
-              <span style={{ fontSize: '13px', color: '#64748B', alignSelf: 'center' }}>Page {page} / {nbPages}</span>
-              <button onClick={() => setPage(p => Math.min(nbPages, p + 1))} disabled={page === nbPages}
-                style={{ padding: '6px 14px', border: '1.5px solid #E2E8F0', borderRadius: '6px', background: '#fff', cursor: page === nbPages ? 'not-allowed' : 'pointer', fontSize: '13px' }}>Suiv. →</button>
-            </div>
-          )}
+          {/* KPIs */}
+          <div style={{ display: 'flex', gap: '14px', marginBottom: '24px' }}>
+            {[
+              { label: 'Total paiements',  value: kpis.total_paiements, color: '#1B3A6B', bg: '#EFF6FF', icon: '🧾', big: false },
+              { label: 'Montant encaissé', value: `${fmt(kpis.total_encaisse)} FCFA`, color: '#16A34A', bg: '#F0FDF4', icon: '💰', big: true },
+            ].map(({ label, value, color, bg, icon }) => (
+              <div key={label} className="ft-card" style={{
+                padding: '18px 22px', flex: 1, borderTop: `3px solid ${color}`, cursor: 'default'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: '#64748B',
+                    textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</span>
+                  <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px' }}>{icon}</div>
+                </div>
+                <div style={{ fontSize: typeof value === 'string' ? '18px' : '28px',
+                  fontWeight: '800', color, lineHeight: 1, letterSpacing: '-0.5px' }}>
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Filtre */}
+          <div className="ft-card" style={{ padding: '14px 18px', marginBottom: '18px', display: 'flex', gap: '10px' }}>
+            <select value={filtreMode} onChange={e => { setFiltreMode(e.target.value); setPage(1) }} style={inp}>
+              <option value="">Tous les modes de paiement</option>
+              {Object.entries(MODE_INFO).map(([k, v]) => (
+                <option key={k} value={k}>{v.label}</option>
+              ))}
+            </select>
+            {filtreMode && (
+              <button onClick={() => { setFiltreMode(''); setPage(1) }}
+                style={{ ...inp, cursor: 'pointer', color: '#64748B', fontWeight: '600', fontSize: '12px' }}>
+                ✕ Effacer
+              </button>
+            )}
+          </div>
+
+          {/* Tableau */}
+          <div className="ft-card" style={{ overflow: 'hidden' }}>
+            {loading ? (
+              <div style={{ padding: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+                <div className="ft-spinner" />
+                <span style={{ fontSize: '13px', color: '#94A3B8' }}>Chargement des paiements…</span>
+              </div>
+            ) : paiements.length === 0 ? (
+              <div className="ft-empty">
+                <span className="ft-empty-icon">💳</span>
+                <span className="ft-empty-title">Aucun paiement trouvé</span>
+                <span className="ft-empty-sub">
+                  {filtreMode ? 'Modifiez le filtre de mode de paiement' : 'Enregistrez un premier paiement'}
+                </span>
+              </div>
+            ) : (
+              <table>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', borderBottom: '2px solid #E2E8F0' }}>
+                    {['Référence', 'Étudiant', 'Montant', 'Mode', 'Motif', 'Date', ''].map(h => (
+                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px',
+                        fontWeight: '700', color: '#64748B', textTransform: 'uppercase',
+                        letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {paiements.map((p, i) => {
+                    const mi = MODE_INFO[p.mode_paiement] || MODE_INFO.especes
+                    return (
+                      <tr key={p.id} className="ft-tr"
+                        style={{ background: i % 2 === 0 ? '#fff' : '#FAFBFC', borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: '700',
+                            color: '#1B3A6B', background: '#EFF6FF', padding: '3px 8px', borderRadius: '5px' }}>
+                            {p.reference || `FT-${String(p.id).padStart(5, '0')}`}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#1E293B' }}>
+                          {p.etudiant}
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ fontSize: '15px', fontWeight: '800', color: '#16A34A' }}>{fmt(p.montant)}</span>
+                          <span style={{ fontSize: '11px', color: '#94A3B8', marginLeft: '4px' }}>FCFA</span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px',
+                            background: mi.bg, color: mi.color, padding: '3px 10px',
+                            borderRadius: '99px', fontSize: '12px', fontWeight: '700' }}>
+                            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: mi.dot }} />
+                            {mi.label}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '13px', color: '#64748B', maxWidth: '130px',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {p.motif || <span style={{ color: '#CBD5E1' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '12px 16px', fontSize: '12px', color: '#94A3B8', whiteSpace: 'nowrap' }}>
+                          {p.date_paiement}
+                        </td>
+                        <td style={{ padding: '10px 16px' }}>
+                          <button onClick={() => handleRecu(p.id, p.reference)}
+                            style={{ ...inp, cursor: 'pointer', color: '#2563EB', background: '#EFF6FF',
+                              fontWeight: '600', fontSize: '12px', border: 'none', whiteSpace: 'nowrap' }}>
+                            🖨️ Reçu
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {/* Pagination */}
+            {nbPages > 1 && (
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center',
+                gap: '6px', padding: '14px', borderTop: '1px solid #F1F5F9' }}>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  style={{ ...inp, cursor: page === 1 ? 'not-allowed' : 'pointer', fontWeight: '600',
+                    color: page === 1 ? '#CBD5E1' : '#1B3A6B' }}>← Préc.</button>
+                {Array.from({ length: Math.min(nbPages, 7) }, (_, i) => i + 1).map(n => (
+                  <button key={n} onClick={() => setPage(n)}
+                    style={{ width: '32px', height: '32px', border: 'none', borderRadius: '7px',
+                      fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                      background: page === n ? '#1B3A6B' : '#F1F5F9',
+                      color:      page === n ? '#fff'    : '#64748B' }}>{n}</button>
+                ))}
+                <button onClick={() => setPage(p => Math.min(nbPages, p + 1))} disabled={page === nbPages}
+                  style={{ ...inp, cursor: page === nbPages ? 'not-allowed' : 'pointer', fontWeight: '600',
+                    color: page === nbPages ? '#CBD5E1' : '#1B3A6B' }}>Suiv. →</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      {showModal && <ModalPaiement etudiants={etudiants} caisses={caisses} onClose={() => setShowModal(false)} onSave={() => fetchPaiements()} />}
+
+      {showModal && (
+        <ModalPaiement
+          caisses={caisses}
+          onClose={() => setShowModal(false)}
+          onSave={() => { fetchPaiements(); setShowModal(false) }}
+          onRecu={handleRecu}
+        />
+      )}
     </div>
   )
 }

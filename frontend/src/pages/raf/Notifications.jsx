@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Sidebar from '../../components/Sidebar'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
@@ -23,6 +24,8 @@ const TYPE_CONFIG = {
 }
 
 export default function CentreNotifications() {
+  const navigate = useNavigate()
+  const user     = JSON.parse(localStorage.getItem('user') || '{}')
   const [notifs, setNotifs]         = useState([])
   const [loading, setLoading]       = useState(true)
   const [filtrePrio, setFiltrePrio] = useState('')
@@ -52,13 +55,24 @@ export default function CentreNotifications() {
 
   useEffect(() => { fetchNotifs() }, [fetchNotifs])
 
-  const handleMarquerLu = async (id) => {
+  const handleMarquerLu = async (id, type) => {
     await fetch(`${API}/notifications/${id}/lu`, { method: 'PUT', headers: getHeaders() }).catch(() => {})
     fetchNotifs()
+    if (type === 'message') {
+      navigate(user.role === 'raf' ? '/raf/messagerie' : '/comptable/messagerie')
+    }
   }
 
   const handleToutLire = async () => {
     await fetch(`${API}/notifications/tout-lire`, { method: 'PUT', headers: getHeaders() }).catch(() => {})
+    fetchNotifs()
+  }
+
+  const handleSupprimerLues = async () => {
+    const nbLues = notifs.filter(n => n.lu).length
+    if (nbLues === 0) return
+    if (!window.confirm(`Supprimer définitivement les ${nbLues} notification(s) lue(s) ?`)) return
+    await fetch(`${API}/notifications/lues`, { method: 'DELETE', headers: getHeaders() }).catch(() => {})
     fetchNotifs()
   }
 
@@ -105,13 +119,23 @@ export default function CentreNotifications() {
               {nbNonLues} notification{nbNonLues > 1 ? 's' : ''} non lue{nbNonLues > 1 ? 's' : ''}
             </p>
           </div>
-          {nbNonLues > 0 && (
-            <button onClick={handleToutLire}
-              style={{ padding: '10px 20px', background: '#1B3A6B', color: '#fff',
-                border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
-              ✅ Tout marquer comme lu
-            </button>
-          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {nbNonLues > 0 && (
+              <button onClick={handleToutLire}
+                style={{ padding: '10px 20px', background: '#1B3A6B', color: '#fff',
+                  border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}>
+                ✅ Tout marquer comme lu
+              </button>
+            )}
+            {notifs.some(n => n.lu) && (
+              <button onClick={handleSupprimerLues}
+                style={{ padding: '10px 20px', background: '#fff', color: '#DC2626',
+                  border: '1.5px solid #FECACA', borderRadius: '8px', cursor: 'pointer',
+                  fontSize: '13px', fontWeight: '600' }}>
+                🗑️ Supprimer les lues
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Cartes résumé priorité */}
@@ -230,11 +254,14 @@ export default function CentreNotifications() {
 
                 {/* Action */}
                 {!n.lu && (
-                  <button onClick={() => handleMarquerLu(n.id)}
-                    style={{ padding: '6px 14px', background: '#F1F5F9', border: 'none', borderRadius: '6px',
-                      cursor: 'pointer', fontSize: '12px', color: '#475569', fontWeight: '600',
-                      flexShrink: 0, whiteSpace: 'nowrap' }}>
-                    ✓ Lu
+                  <button onClick={() => handleMarquerLu(n.id, n.type)}
+                    style={{ padding: '6px 14px',
+                      background: n.type === 'message' ? '#EFF6FF' : '#F1F5F9',
+                      border: 'none', borderRadius: '6px',
+                      cursor: 'pointer', fontSize: '12px',
+                      color: n.type === 'message' ? '#1B3A6B' : '#475569',
+                      fontWeight: '600', flexShrink: 0, whiteSpace: 'nowrap' }}>
+                    {n.type === 'message' ? '✉️ Voir le message' : '✓ Lu'}
                   </button>
                 )}
               </div>

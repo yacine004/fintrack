@@ -96,7 +96,7 @@ export default function SuiviPaiements() {
               type="text"
               value={matricule}
               onChange={(e) => setMatricule(e.target.value)}
-              placeholder="Ex : ISM2026001"
+              placeholder="Ex : ISM2526/DK-00001"
               required
               style={{
                 flex: 1, minWidth: '200px', padding: '13px 16px',

@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import Sidebar from '../../components/Sidebar'
+import PhoneInput, { PhoneDisplay } from '../../components/PhoneInput'
 
 const api = () => axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
 })
 
-const EMPTY_FORM = { nom:'', prenom:'', email:'', contact:'', role:'comptable', password:'' }
+const EMPTY_FORM = { nom:'', prenom:'', civilite:'M.', email:'', contact:'', role:'comptable', password:'' }
 
 export default function Utilisateurs() {
   const navigate = useNavigate()
@@ -52,8 +53,8 @@ export default function Utilisateurs() {
     setFormError('')
     setSelected(user)
     setForm(user ? {
-      nom: user.nom, prenom: user.prenom, email: user.email,
-      contact: user.contact, role: user.role, password: ''
+      nom: user.nom, prenom: user.prenom, civilite: user.civilite || 'M.',
+      email: user.email, contact: user.contact, role: user.role, password: ''
     } : EMPTY_FORM)
     setModal(type)
   }
@@ -102,6 +103,20 @@ export default function Utilisateurs() {
       showSuccess('Rôle modifié avec succès !')
     } catch (e) { setFormError(e.response?.data?.message || 'Erreur') }
     finally { setSaving(false) }
+  }
+
+  const handleReset = async (user) => {
+    if (!window.confirm(`Réinitialiser le mot de passe de ${user.prenom} ${user.nom} ?`)) return
+    try {
+      const res = await api().put(`/utilisateurs/${user.id}/reset-password`)
+      setCredentials({
+        nom: `${res.data.utilisateur.prenom} ${res.data.utilisateur.nom}`,
+        email: res.data.utilisateur.email,
+        password: res.data.nouveau_mot_de_passe,
+        role: res.data.utilisateur.role,
+        isReset: true
+      })
+    } catch (e) { alert(e.response?.data?.message || 'Erreur lors de la réinitialisation') }
   }
 
   const handleSupprimer = async () => {
@@ -273,8 +288,8 @@ export default function Utilisateurs() {
                         </div>
                       </td>
                       <td style={{ padding:'12px 16px', color:'#64748B' }}>{u.email}</td>
-                      <td style={{ padding:'12px 16px', color:'#64748B' }}>
-                        {u.contact || '—'}
+                      <td style={{ padding:'12px 16px' }}>
+                        <PhoneDisplay value={u.contact} />
                       </td>
                       <td style={{ padding:'12px 16px' }}>
                         <span style={{
@@ -313,6 +328,12 @@ export default function Utilisateurs() {
                               color:'#92400E', border:'none', borderRadius:'6px',
                               fontSize:'11px', fontWeight:'600', cursor:'pointer' }}>
                             🔑 Rôle
+                          </button>
+                          <button onClick={() => handleReset(u)}
+                            style={{ padding:'5px 10px', background:'#F3E8FF',
+                              color:'#7C3AED', border:'none', borderRadius:'6px',
+                              fontSize:'11px', fontWeight:'600', cursor:'pointer' }}>
+                            🔓 MDP
                           </button>
                           <button onClick={() => openModal('supprimer', u)}
                             style={{ padding:'5px 10px', background:'#FEE2E2',
@@ -381,6 +402,21 @@ export default function Utilisateurs() {
             {/* Formulaire Créer / Modifier */}
             {(modal === 'creer' || modal === 'modifier') && (
               <>
+                <div style={{ marginBottom:'14px' }}>
+                  <label style={labelStyle}>Civilité *</label>
+                  <div style={{ display:'flex', gap:'10px' }}>
+                    {['M.', 'Mme'].map(c => (
+                      <label key={c} style={{ display:'flex', alignItems:'center', gap:'6px',
+                        cursor:'pointer', fontSize:'13px', fontWeight: form.civilite === c ? '700' : '400',
+                        color: form.civilite === c ? '#1B3A6B' : '#64748B' }}>
+                        <input type="radio" name="civilite" value={c}
+                          checked={form.civilite === c}
+                          onChange={() => setForm({ ...form, civilite: c })} />
+                        {c}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px' }}>
                   {[
                     { label:'Nom *',    key:'nom',    type:'text',  ph:'Ex: Diallo' },
@@ -394,17 +430,19 @@ export default function Utilisateurs() {
                     </div>
                   ))}
                 </div>
-                {[
-                  { label:'Email *',   key:'email',   type:'email',    ph:'user@fintrack.sn' },
-                  { label:'Contact',   key:'contact', type:'text',     ph:'Ex: 77 123 45 67' },
-                ].map(({ label, key, type, ph }) => (
-                  <div key={key} style={{ marginBottom:'14px' }}>
-                    <label style={labelStyle}>{label}</label>
-                    <input type={type} value={form[key]} placeholder={ph}
-                      onChange={e => setForm({ ...form, [key]: e.target.value })}
-                      style={inputStyle}/>
-                  </div>
-                ))}
+                <div style={{ marginBottom:'14px' }}>
+                  <label style={labelStyle}>Email *</label>
+                  <input type="email" value={form.email} placeholder="user@fintrack.sn"
+                    onChange={e => setForm({ ...form, email: e.target.value })}
+                    style={inputStyle}/>
+                </div>
+                <div style={{ marginBottom:'14px' }}>
+                  <label style={labelStyle}>Contact</label>
+                  <PhoneInput
+                    value={form.contact || ''}
+                    onChange={v => setForm({ ...form, contact: v })}
+                  />
+                </div>
                 <div style={{ marginBottom:'14px' }}>
                   <label style={labelStyle}>Rôle *</label>
                   <select value={form.role}
@@ -501,12 +539,15 @@ export default function Utilisateurs() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
           <div style={{ background: '#fff', borderRadius: '16px', padding: '36px',
             width: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)', textAlign: 'center' }}>
-            <div style={{ fontSize: '48px', marginBottom: '12px' }}>✅</div>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>{credentials.isReset ? '🔓' : '✅'}</div>
             <h2 style={{ margin: '0 0 6px', fontSize: '20px', fontWeight: '800', color: '#1B3A6B' }}>
-              Compte créé avec succès
+              {credentials.isReset ? 'Mot de passe réinitialisé' : 'Compte créé avec succès'}
             </h2>
             <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#64748B' }}>
-              Communiquez ces identifiants à <strong>{credentials.nom}</strong>
+              {credentials.isReset
+                ? <>Communiquez ce nouveau mot de passe à <strong>{credentials.nom}</strong></>
+                : <>Communiquez ces identifiants à <strong>{credentials.nom}</strong></>
+              }
             </p>
 
             <div style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0',

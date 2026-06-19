@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
 from extensions import db
-from models import Etudiant, Paiement
+from models import Etudiant, Paiement, AutorisationPassage
 
 etudiants_bp = Blueprint('etudiants', __name__)
 
@@ -62,7 +62,7 @@ def lister():
         query = query.filter(Etudiant.statut == statut)
 
     total    = query.count()
-    etudiants = query.order_by(Etudiant.nom.asc())\
+    etudiants = query.order_by(Etudiant.matricule.asc())\
                      .offset((page - 1) * limit).limit(limit).all()
     nb_pages = (total + limit - 1) // limit
 
@@ -181,9 +181,37 @@ def supprimer(eid):
     if not etudiant:
         return jsonify({'message': 'Étudiant introuvable'}), 404
 
-    db.session.delete(etudiant)
-    db.session.commit()
-    return jsonify({'message': 'Étudiant supprimé avec succès'}), 200
+    try:
+        # Supprimer les enregistrements liés avant de supprimer l'étudiant
+        db.session.query(Paiement).filter_by(id_etudiant=eid).delete()
+        db.session.query(AutorisationPassage).filter_by(id_etudiant=eid).delete()
+        db.session.delete(etudiant)
+        db.session.commit()
+        return jsonify({'message': 'Étudiant supprimé avec succès'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'Erreur lors de la suppression : {str(e)}'}), 500
+
+
+# ── PROCHAIN MATRICULE ────────────────────────────────────────────────────────
+@etudiants_bp.route('/prochain-matricule', methods=['GET'])
+@auth_required
+def prochain_matricule():
+    annee  = request.args.get('annee', '2025-2026').strip()
+    parts  = annee.split('-')
+    code   = (parts[0][-2:] + parts[1][-2:]) if len(parts) == 2 else '2526'
+    prefix = f'ISM{code}/DK-'
+
+    mats = db.session.query(Etudiant.matricule)\
+        .filter(Etudiant.matricule.like(f'{prefix}%')).all()
+
+    max_seq = 0
+    for (mat,) in mats:
+        suffix = mat[len(prefix):]
+        if suffix.isdigit():
+            max_seq = max(max_seq, int(suffix))
+
+    return jsonify({'matricule': f'{prefix}{max_seq + 1:05d}'}), 200
 
 
 # ── STATISTIQUES étudiants ────────────────────────────────────────────────────
@@ -214,17 +242,32 @@ def _get_niveau(classe):
 def _generer_echeancier(classe):
     from datetime import date as _date
     niveau = _get_niveau(classe)
-    frais_mensuel = 100_000 if niveau == 'M1' else 97_500 if niveau == 'M2' else 95_000
+    frais_mensuel = 100_000 if niveau == 'M1' else 97_500 if niveau == 'M2' else 92_500 if niveau == 'L3' else 95_000
     an = 2025
-    inscription = [
-        {'date': _date(an,   9, 5), 'montant': 112_500},
-        {'date': _date(an,  10, 5), 'montant': 112_500},
-        {'date': _date(an+1, 1, 5), 'montant': 112_500},
-        {'date': _date(an+1, 2, 5), 'montant': 112_500},
-    ]
+    # Droits d'inscription : dates différentes Licence (sept/oct/fév/mars) vs Master (oct/nov/mars/avril)
+    if niveau in ('M1', 'M2'):
+        inscription = [
+            {'date': _date(an,   10, 5), 'montant': 112_500},
+            {'date': _date(an,   11, 5), 'montant': 112_500},
+            {'date': _date(an+1, 3,  5), 'montant': 112_500},
+            {'date': _date(an+1, 4,  5), 'montant': 112_500},
+        ]
+    else:
+        inscription = [
+            {'date': _date(an,   9, 5), 'montant': 112_500},
+            {'date': _date(an,  10, 5), 'montant': 112_500},
+            {'date': _date(an+1, 2, 5), 'montant': 112_500},
+            {'date': _date(an+1, 3, 5), 'montant': 112_500},
+        ]
     mois = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
     scolarite = [{'date': _date(an if m >= 9 else an+1, m, 5), 'montant': frais_mensuel} for m in mois]
-    encadrement = [{'date': _date(an+1, 3, 5), 'montant': 75_000}] if niveau == 'L3' else []
+    # Frais d'encadrement et de soutenance de mémoire : 25 000 FCFA, L3 et M2 uniquement
+    if niveau == 'L3':
+        encadrement = [{'date': _date(an+1, 3, 5), 'montant': 25_000}]
+    elif niveau == 'M2':
+        encadrement = [{'date': _date(an+1, 5, 5), 'montant': 25_000}]
+    else:
+        encadrement = []
     items = inscription + scolarite + encadrement
     return items, sum(i['montant'] for i in items)
 

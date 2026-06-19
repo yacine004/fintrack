@@ -20,11 +20,24 @@ import ComptablePaiements from './pages/comptable/Paiements'
 import RafDepenses        from './pages/raf/Depenses'
 import RafBudgets         from './pages/raf/Budgets'
 import ComptableDepenses  from './pages/comptable/Depenses'
+import ComptableCaisses   from './pages/comptable/Caisses'
 
 // Sprint 5
 import RafDashboard       from './pages/raf/Dashboard'
 import RafRapports        from './pages/raf/Rapports'
 import ComptableDashboard from './pages/comptable/Dashboard'
+
+// Sprint 7 — Inscriptions (RAF uniquement)
+import RafInscriptions        from './pages/raf/Inscriptions'
+
+// Sprint 8 — Alertes, Autorisations, Paramétrage
+import RafAlertes             from './pages/raf/Alertes'
+import RafAutorisations       from './pages/raf/Autorisations'
+import RafParametrage         from './pages/raf/Parametrage'
+
+// Sprint 9 — Frais annexes
+import RafFraisAnnexes        from './pages/raf/FraisAnnexes'
+import ComptableFraisAnnexes  from './pages/comptable/FraisAnnexes'
 
 // Sprint 6
 import RafMessagerie         from './pages/raf/Messagerie'
@@ -64,7 +77,12 @@ export default function App() {
         <Route path="/raf/rapports"     element={<PrivateRoute role="raf"><RafRapports /></PrivateRoute>} />
         <Route path="/raf/messagerie"   element={<PrivateRoute role="raf"><RafMessagerie /></PrivateRoute>} />
         <Route path="/raf/audit"          element={<PrivateRoute role="raf"><RafAuditLog /></PrivateRoute>} />
-        <Route path="/raf/notifications"  element={<PrivateRoute role="raf"><RafNotifications /></PrivateRoute>} />
+        <Route path="/raf/notifications"   element={<PrivateRoute role="raf"><RafNotifications /></PrivateRoute>} />
+        <Route path="/raf/inscriptions"    element={<PrivateRoute role="raf"><RafInscriptions /></PrivateRoute>} />
+        <Route path="/raf/alertes"         element={<PrivateRoute role="raf"><RafAlertes /></PrivateRoute>} />
+        <Route path="/raf/autorisations"   element={<PrivateRoute role="raf"><RafAutorisations /></PrivateRoute>} />
+        <Route path="/raf/parametrage"     element={<PrivateRoute role="raf"><RafParametrage /></PrivateRoute>} />
+        <Route path="/raf/frais-annexes"   element={<PrivateRoute role="raf"><RafFraisAnnexes /></PrivateRoute>} />
 
         {/* ── COMPTABLE ── */}
         <Route path="/comptable/dashboard"   element={<PrivateRoute role="comptable"><ComptableDashboard /></PrivateRoute>} />
@@ -72,8 +90,10 @@ export default function App() {
         <Route path="/comptable/etudiants"   element={<PrivateRoute role="comptable"><ComptableEtudiants /></PrivateRoute>} />
         <Route path="/comptable/paiements"   element={<PrivateRoute role="comptable"><ComptablePaiements /></PrivateRoute>} />
         <Route path="/comptable/depenses"    element={<PrivateRoute role="comptable"><ComptableDepenses /></PrivateRoute>} />
+        <Route path="/comptable/caisses"    element={<PrivateRoute role="comptable"><ComptableCaisses /></PrivateRoute>} />
+        <Route path="/comptable/frais-annexes" element={<PrivateRoute role="comptable"><ComptableFraisAnnexes /></PrivateRoute>} />
         <Route path="/comptable/messagerie"     element={<PrivateRoute role="comptable"><ComptableMessagerie /></PrivateRoute>} />
-        <Route path="/comptable/notifications" element={<PrivateRoute role="comptable"><ComptableNotifications /></PrivateRoute>} />
+        <Route path="/comptable/notifications"  element={<PrivateRoute role="comptable"><ComptableNotifications /></PrivateRoute>} />
       </Routes>
     </BrowserRouter>
   )

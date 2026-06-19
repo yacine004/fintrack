@@ -3,8 +3,12 @@ flask-sqlalchemy
 flask-bcrypt
 flask-jwt-extended
 flask-cors
+flask-mail
 psycopg2-binary
 python-dotenv
 gunicorn
-prometheus-flask-exporterpytest==9.1.0
+reportlab
+openpyxl
+prometheus-flask-exporter
+pytest==9.1.0
 pytest

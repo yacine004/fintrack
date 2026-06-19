@@ -83,6 +83,7 @@ export default function RafRapports() {
       const data = await res.json()
       if (!res.ok) { setErreur(data.message); return }
       fetchRapports()
+      await handleExporter(data.rapport.id, format)
     } catch { setErreur('Erreur de connexion') }
     finally { setGenerating(false) }
   }
@@ -282,6 +283,11 @@ export default function RafRapports() {
                           style={{ padding: '5px 10px', background: '#F0FDF4', color: '#16A34A',
                             border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
                           📊 Excel
+                        </button>
+                        <button onClick={() => handleExporter(r.id, 'csv')}
+                          style={{ padding: '5px 10px', background: '#F5F3FF', color: '#7C3AED',
+                            border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>
+                          🗂️ CSV
                         </button>
                       </div>
                     </td>

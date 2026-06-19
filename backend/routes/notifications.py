@@ -63,6 +63,18 @@ def marquer_lu(nid):
     return jsonify({'message': 'Notification marquée comme lue'}), 200
 
 
+# ── SUPPRIMER les notifications lues ─────────────────────────────────────────
+@notifications_bp.route('/lues', methods=['DELETE'])
+@auth_required
+def supprimer_lues():
+    identity = get_jwt().get('user', {})
+    uid      = identity.get('id')
+    nb = db.session.query(Notification)\
+        .filter_by(id_utilisateur=uid, lu=True).delete()
+    db.session.commit()
+    return jsonify({'message': f'{nb} notification(s) supprimée(s)'}), 200
+
+
 # ── MARQUER TOUTES comme lues ─────────────────────────────────────────────────
 @notifications_bp.route('/tout-lire', methods=['PUT'])
 @auth_required

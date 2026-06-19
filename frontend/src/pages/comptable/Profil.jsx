@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import Sidebar from '../../components/Sidebar'
+import PhoneInput from '../../components/PhoneInput'
 
 const api = () => axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -12,7 +13,7 @@ export default function Profil() {
   const navigate  = useNavigate()
   const [user, setUser]         = useState(null)
   const [tab, setTab]           = useState('profil')
-  const [form, setForm]         = useState({ nom:'', prenom:'', contact:'' })
+  const [form, setForm]         = useState({ nom:'', prenom:'', contact:'', civilite:'M.' })
   const [mdp, setMdp]           = useState({ ancien:'', nouveau:'', confirmation:'' })
   const [saving, setSaving]     = useState(false)
   const [success, setSuccess]   = useState('')
@@ -21,7 +22,7 @@ export default function Profil() {
   useEffect(() => {
     api().get('/auth/me').then(res => {
       setUser(res.data)
-      setForm({ nom: res.data.nom, prenom: res.data.prenom, contact: res.data.contact || '' })
+      setForm({ nom: res.data.nom, prenom: res.data.prenom, contact: res.data.contact || '', civilite: res.data.civilite || 'M.' })
     }).catch(() => navigate('/'))
   }, [])
 
@@ -154,6 +155,22 @@ export default function Profil() {
             {tab === 'profil' && (
               <div style={{ background:'#fff', borderRadius:'12px',
                 border:'1px solid #E2E8F0', padding:'28px' }}>
+                {/* Civilité */}
+                <div style={{ marginBottom:'16px' }}>
+                  <label style={labelStyle}>Civilité</label>
+                  <div style={{ display:'flex', gap:'16px' }}>
+                    {[{ val:'M.', lib:'M.' }, { val:'Mme', lib:'Mme' }].map(({ val, lib }) => (
+                      <label key={val} style={{ display:'flex', alignItems:'center', gap:'6px',
+                        cursor:'pointer', fontSize:'13px', color:'#374151', fontWeight:'500' }}>
+                        <input type="radio" name="civilite" value={val}
+                          checked={form.civilite === val}
+                          onChange={() => setForm({ ...form, civilite: val })}
+                          style={{ accentColor:'#1B3A6B', width:'15px', height:'15px' }}/>
+                        {lib}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr',
                   gap:'16px', marginBottom:'16px' }}>
                   {[
@@ -179,9 +196,10 @@ export default function Profil() {
                 </div>
                 <div style={{ marginBottom:'24px' }}>
                   <label style={labelStyle}>Contact</label>
-                  <input value={form.contact} placeholder="Ex: 77 123 45 67"
-                    onChange={e => setForm({ ...form, contact: e.target.value })}
-                    style={inputStyle}/>
+                  <PhoneInput
+                    value={form.contact || ''}
+                    onChange={v => setForm({ ...form, contact: v })}
+                  />
                 </div>
                 <button onClick={saveProfil} disabled={saving}
                   style={{ padding:'11px 28px',

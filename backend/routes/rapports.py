@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, make_response
 from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
 from extensions import db
@@ -369,10 +369,13 @@ def _export_pdf(rapport, donnees):
         ))
 
         doc.build(elems)
-        buffer.seek(0)
-
-        return send_file(buffer, mimetype='application/pdf', as_attachment=False,
-                         download_name=f'rapport_{donnees["type"]}_{donnees["periode"]}.pdf')
+        pdf_bytes = buffer.getvalue()
+        filename  = f'rapport_{donnees["type"]}_{donnees["periode"]}.pdf'
+        resp = make_response(pdf_bytes)
+        resp.headers['Content-Type']        = 'application/pdf'
+        resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        resp.headers['Content-Length']      = len(pdf_bytes)
+        return resp
 
     except ImportError:
         return jsonify({'message': 'ReportLab non installé'}), 500
@@ -556,12 +559,13 @@ def _export_excel(rapport, donnees):
 
         buffer = io.BytesIO()
         wb.save(buffer)
-        buffer.seek(0)
-
-        return send_file(buffer,
-                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                         as_attachment=True,
-                         download_name=f'rapport_{donnees["type"]}_{donnees["periode"]}.xlsx')
+        xlsx_bytes = buffer.getvalue()
+        filename   = f'rapport_{donnees["type"]}_{donnees["periode"]}.xlsx'
+        resp = make_response(xlsx_bytes)
+        resp.headers['Content-Type']        = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        resp.headers['Content-Length']      = len(xlsx_bytes)
+        return resp
 
     except ImportError:
         return jsonify({'message': 'openpyxl non installé. Exécutez : pip install openpyxl'}), 500
@@ -617,15 +621,13 @@ def _export_csv(rapport, donnees):
                 ])
 
         # BOM UTF-8 pour compatibilité Excel
-        content = '﻿' + output.getvalue()
-        buffer = io.BytesIO(content.encode('utf-8'))
-
-        return send_file(
-            buffer,
-            mimetype='text/csv; charset=utf-8',
-            as_attachment=True,
-            download_name=f'rapport_{donnees["type"]}_{donnees["periode"]}.csv'
-        )
+        csv_bytes = ('﻿' + output.getvalue()).encode('utf-8')
+        filename  = f'rapport_{donnees["type"]}_{donnees["periode"]}.csv'
+        resp = make_response(csv_bytes)
+        resp.headers['Content-Type']        = 'text/csv; charset=utf-8'
+        resp.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        resp.headers['Content-Length']      = len(csv_bytes)
+        return resp
 
     except Exception as e:
         return jsonify({'message': f'Erreur CSV : {str(e)}'}), 500

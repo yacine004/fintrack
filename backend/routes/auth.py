@@ -67,6 +67,8 @@ def modifier_profil():
         user.prenom = data['prenom'].strip()
     if 'contact' in data:
         user.contact = data['contact'].strip()
+    if 'civilite' in data and data['civilite'] in ('M.', 'Mme'):
+        user.civilite = data['civilite']
 
     db.session.commit()
     return jsonify({'message': 'Profil mis à jour', 'user': user.to_dict()}), 200

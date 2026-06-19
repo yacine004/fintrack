@@ -5,6 +5,7 @@ from extensions import db
 from models import Paiement, Depense, Caisse, Etudiant, Budget
 from datetime import datetime, timedelta
 from sqlalchemy import func
+from routes.alertes import _calcul_retard, _get_niveau, _echeancier as _echeancier_bareme
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -61,17 +62,50 @@ def get_dashboard():
 
     nb_etudiants_actifs = db.session.query(Etudiant).filter_by(statut='actif').count()
 
-    nb_impayes         = 0
-    impayes_par_classe = {}
-    montant_attendu    = 500000
+    nb_impayes           = 0
+    impayes_par_classe   = {}
+    recouvrement_classe  = {}
+    recouvrement_filiere = {}
     if role == 'raf':
         etudiants = db.session.query(Etudiant).filter_by(statut='actif').all()
         for e in etudiants:
-            total_paye = sum(float(p.montant) for p in e.paiements)
-            if total_paye < montant_attendu:
+            total_paye = float(db.session.query(
+                func.coalesce(func.sum(Paiement.montant), 0)
+            ).filter(
+                Paiement.id_etudiant == e.id_etudiant,
+                Paiement.annee_academique == e.annee_academique
+            ).scalar())
+            du, _ = _calcul_retard(e, total_paye)
+            if du > 0:
                 nb_impayes += 1
-                classe = e.classe or 'Inconnue'
-                impayes_par_classe[classe] = impayes_par_classe.get(classe, 0) + 1
+                classe_du = e.classe or 'Inconnue'
+                impayes_par_classe[classe_du] = impayes_par_classe.get(classe_du, 0) + 1
+
+            # ── Taux de recouvrement (montant attendu sur l'année vs encaissé) ──
+            niveau        = _get_niveau(e.classe)
+            total_attendu = sum(m for _, m, _ in _echeancier_bareme(niveau, e.annee_academique))
+
+            classe = e.classe or 'Inconnue'
+            rc = recouvrement_classe.setdefault(classe, {'attendu': 0.0, 'paye': 0.0})
+            rc['attendu'] += total_attendu
+            rc['paye']    += total_paye
+
+            filiere = e.filiere or 'Non définie'
+            rf = recouvrement_filiere.setdefault(filiere, {'attendu': 0.0, 'paye': 0.0})
+            rf['attendu'] += total_attendu
+            rf['paye']    += total_paye
+
+    taux_recouvrement_classe = sorted([
+        {'classe': k, 'attendu': v['attendu'], 'paye': v['paye'],
+         'taux': round(v['paye'] / v['attendu'] * 100, 1) if v['attendu'] > 0 else 0}
+        for k, v in recouvrement_classe.items()
+    ], key=lambda x: x['classe'])
+
+    taux_recouvrement_filiere = sorted([
+        {'filiere': k, 'attendu': v['attendu'], 'paye': v['paye'],
+         'taux': round(v['paye'] / v['attendu'] * 100, 1) if v['attendu'] > 0 else 0}
+        for k, v in recouvrement_filiere.items()
+    ], key=lambda x: -x['taux'])
 
     # ── Évolution 6 mois ─────────────────────────────────────────────────────
     evolution = []
@@ -229,5 +263,7 @@ def get_dashboard():
         'alertes_intelligentes': alertes_intelligentes,
         'comparaison':           comparaison,
         'previsions':            previsions,
+        'taux_recouvrement_classe':  taux_recouvrement_classe,
+        'taux_recouvrement_filiere': taux_recouvrement_filiere,
         'role':                  role,
     }), 200

@@ -1,3 +1,5 @@
+import secrets
+import string
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
@@ -65,6 +67,7 @@ def creer():
     data = request.get_json()
     nom      = data.get('nom', '').strip()
     prenom   = data.get('prenom', '').strip()
+    civilite = data.get('civilite', 'M.').strip()
     email    = data.get('email', '').strip().lower()
     contact  = data.get('contact', '').strip()
     role     = data.get('role', '').strip()
@@ -80,7 +83,8 @@ def creer():
         return jsonify({'message': 'Cet email est déjà utilisé'}), 409
 
     user = Utilisateur(
-        nom=nom, prenom=prenom, email=email, contact=contact, role=role,
+        nom=nom, prenom=prenom, civilite=civilite if civilite in ('M.', 'Mme') else 'M.',
+        email=email, contact=contact, role=role,
         mot_de_passe_hash=bcrypt.generate_password_hash(password).decode()
     )
     db.session.add(user)
@@ -103,6 +107,8 @@ def modifier(uid):
         user.nom = data['nom'].strip()
     if 'prenom' in data and data['prenom'].strip():
         user.prenom = data['prenom'].strip()
+    if 'civilite' in data and data['civilite'] in ('M.', 'Mme'):
+        user.civilite = data['civilite']
     if 'contact' in data:
         user.contact = data['contact'].strip()
     if 'role' in data and data['role'] in ('raf', 'comptable'):
@@ -152,6 +158,27 @@ def changer_role(uid):
     user.role = role
     db.session.commit()
     return jsonify({'message': f"Rôle modifié en {role}", 'utilisateur': user.to_dict()}), 200
+
+# ── RÉINITIALISER MOT DE PASSE ───────────────────────────────────────────────
+@utilisateurs_bp.route('/<int:uid>/reset-password', methods=['PUT'])
+@raf_required
+def reset_password(uid):
+    user = db.session.get(Utilisateur, uid)
+    if not user:
+        return jsonify({'message': 'Utilisateur introuvable'}), 404
+
+    alphabet = string.ascii_letters + string.digits
+    new_password = ''.join(secrets.choice(alphabet) for _ in range(10))
+    user.mot_de_passe_hash = bcrypt.generate_password_hash(new_password).decode()
+    db.session.commit()
+    identity = get_jwt().get('user', {})
+    log_action(identity.get('id'), 'RESET_PASSWORD', 'Utilisateur', uid, {'nom': f"{user.prenom} {user.nom}"})
+    db.session.commit()
+    return jsonify({
+        'message': 'Mot de passe réinitialisé avec succès',
+        'utilisateur': user.to_dict(),
+        'nouveau_mot_de_passe': new_password
+    }), 200
 
 # ── SUPPRIMER ─────────────────────────────────────────────────────────────────
 @utilisateurs_bp.route('/<int:uid>', methods=['DELETE'])

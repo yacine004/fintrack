@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
 from extensions import db
-from models import Message, Utilisateur
+from models import Message, Utilisateur, Notification
 from datetime import datetime
 
 messages_bp = Blueprint('messages', __name__)
@@ -44,6 +44,17 @@ def envoyer():
         contenu=contenu
     )
     db.session.add(msg)
+
+    # Notification pour le destinataire
+    expediteur_obj = db.session.get(Utilisateur, id_expediteur)
+    exp_nom = f"{expediteur_obj.prenom} {expediteur_obj.nom}" if expediteur_obj else "Quelqu'un"
+    notif = Notification(
+        id_utilisateur=id_destinataire,
+        type='message',
+        message=f"Nouveau message de {exp_nom} : {objet}",
+        priorite='normale'
+    )
+    db.session.add(notif)
     db.session.commit()
 
     return jsonify({

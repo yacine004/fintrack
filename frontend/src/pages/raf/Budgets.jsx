@@ -103,12 +103,141 @@ function ModalBudget({ budget, onClose, onSave }) {
   )
 }
 
+// ── Modal réaffectation inter-budgets ─────────────────────────────────────────
+function ModalReaffecter({ destination, allBudgets, onClose, onSave }) {
+  const [idSource, setIdSource] = useState('')
+  const [montant,  setMontant]  = useState('')
+  const [erreur,   setErreur]   = useState('')
+  const [loading,  setLoading]  = useState(false)
+
+  // Sources éligibles : ont de la marge et ne sont pas la destination
+  const sources    = allBudgets.filter(b => b.id !== destination.id && b.montant_restant > 0)
+  const srcBudget  = sources.find(b => b.id === parseInt(idSource))
+  const margeSource = srcBudget ? srcBudget.montant_restant : 0
+  const montantNum  = parseFloat(montant) || 0
+
+  const transferer = async () => {
+    setErreur('')
+    if (!idSource)              { setErreur('Sélectionnez un budget source'); return }
+    if (!montant || montantNum <= 0) { setErreur('Entrez un montant positif'); return }
+    if (montantNum > margeSource)    { setErreur(`Marge disponible : ${margeSource.toLocaleString('fr-FR')} FCFA`); return }
+    setLoading(true)
+    const res  = await fetch(`${API}/budgets/reaffecter`, {
+      method: 'POST', headers: getHeaders(),
+      body: JSON.stringify({ id_source: parseInt(idSource), id_destination: destination.id, montant: montantNum })
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (!res.ok) { setErreur(data.message); return }
+    onSave(data.message)
+    onClose()
+  }
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: '1.5px solid #E2E8F0', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }
+  const labelStyle = { display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748B', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', width: '500px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ margin: 0, fontSize: '18px', color: '#1B3A6B', fontWeight: '700' }}>↔ Réaffectation budgétaire</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer' }}>✕</button>
+        </div>
+
+        {/* Destination fixée */}
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '14px 16px', marginBottom: '20px' }}>
+          <div style={{ fontSize: '11px', fontWeight: '700', color: '#DC2626', textTransform: 'uppercase', marginBottom: '4px' }}>Budget à renforcer (destination)</div>
+          <div style={{ fontSize: '16px', fontWeight: '700', color: '#1E293B' }}>{destination.categorie}</div>
+          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+            Alloué : {destination.montant_alloue.toLocaleString('fr-FR')} FCFA · Consommé : {destination.montant_consomme.toLocaleString('fr-FR')} FCFA
+          </div>
+        </div>
+
+        {/* Sélecteur source */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={labelStyle}>Budget source (doit avoir de la marge)</label>
+          {sources.length === 0 ? (
+            <div style={{ padding: '12px 14px', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '8px', color: '#B45309', fontSize: '13px' }}>
+              Aucun budget avec marge disponible pour cette année
+            </div>
+          ) : (
+            <select value={idSource} onChange={e => setIdSource(e.target.value)} style={inputStyle}>
+              <option value="">— Sélectionner —</option>
+              {sources.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.categorie} — marge : {s.montant_restant.toLocaleString('fr-FR')} FCFA
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Montant */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={labelStyle}>Montant à transférer (FCFA)</label>
+          <input type="number" value={montant} onChange={e => setMontant(e.target.value)}
+            placeholder="Ex : 100 000" min="0" max={margeSource} style={inputStyle} />
+          {srcBudget && (
+            <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+              Marge disponible : <strong>{margeSource.toLocaleString('fr-FR')} FCFA</strong>
+            </div>
+          )}
+        </div>
+
+        {/* Aperçu d'impact */}
+        {srcBudget && montantNum > 0 && (
+          <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#16A34A', textTransform: 'uppercase', marginBottom: '6px' }}>
+              Aperçu de l'impact
+            </div>
+            <div style={{ display: 'flex', gap: '24px' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: '#64748B' }}>{srcBudget.categorie} (source)</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: montantNum > margeSource ? '#DC2626' : '#1E293B' }}>
+                  {srcBudget.montant_alloue.toLocaleString('fr-FR')} → {(srcBudget.montant_alloue - montantNum).toLocaleString('fr-FR')} FCFA
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: '#64748B' }}>{destination.categorie} (dest.)</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#16A34A' }}>
+                  {destination.montant_alloue.toLocaleString('fr-FR')} → {(destination.montant_alloue + montantNum).toLocaleString('fr-FR')} FCFA
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {erreur && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: '8px', padding: '10px 14px', marginBottom: '16px', color: '#DC2626', fontSize: '13px' }}>
+            ⚠️ {erreur}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '10px 20px', border: '1.5px solid #E2E8F0', borderRadius: '8px', background: '#fff', cursor: 'pointer', fontSize: '14px', color: '#64748B' }}>
+            Annuler
+          </button>
+          <button onClick={transferer} disabled={loading || sources.length === 0} style={{
+            padding: '10px 24px', background: loading || sources.length === 0 ? '#94A3B8' : '#1B3A6B',
+            color: '#fff', border: 'none', borderRadius: '8px',
+            cursor: loading || sources.length === 0 ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '600'
+          }}>
+            {loading ? '⏳…' : '↔ Transférer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function RafBudgets() {
   const [budgets, setBudgets] = useState([])
   const [kpis, setKpis]       = useState({ total_alloue: 0, total_consomme: 0, nb_depasses: 0, taux_global: 0 })
   const [loading, setLoading] = useState(true)
   const [annee, setAnnee]     = useState(new Date().getFullYear().toString())
   const [modal, setModal]     = useState(null)
+  const [modalReaff, setModalReaff] = useState(null)
+  const [msgReaff,   setMsgReaff]   = useState('')
 
   const fetchBudgets = useCallback(async () => {
     setLoading(true)
@@ -190,6 +319,13 @@ export default function RafBudgets() {
           </div>
         </div>
 
+        {/* Message réaffectation */}
+        {msgReaff && (
+          <div style={{ padding: '12px 16px', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '8px', color: '#16A34A', fontSize: '14px', fontWeight: '600', marginBottom: '16px' }}>
+            ✓ {msgReaff}
+          </div>
+        )}
+
         {/* Tableau budgets */}
         <div style={{ background: '#fff', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
           {loading ? (
@@ -253,6 +389,14 @@ export default function RafBudgets() {
                           <button onClick={() => setModal(b)}
                             style={{ padding: '5px 10px', background: '#EFF6FF', color: '#2563EB',
                               border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✏️</button>
+                          {(b.alerte === 'depasse' || b.alerte === 'attention') && (
+                            <button onClick={() => { setMsgReaff(''); setModalReaff(b) }}
+                              title="Réaffecter depuis un autre budget"
+                              style={{ padding: '5px 10px', background: '#FFF7ED', color: '#D97706',
+                                border: '1px solid #FDE68A', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                              ↔
+                            </button>
+                          )}
                           <button onClick={() => handleSupprimer(b.id)}
                             style={{ padding: '5px 10px', background: '#FEF2F2', color: '#DC2626',
                               border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>🗑️</button>
@@ -272,6 +416,15 @@ export default function RafBudgets() {
           budget={modal === 'creer' ? null : modal}
           onClose={() => setModal(null)}
           onSave={() => { setModal(null); fetchBudgets() }}
+        />
+      )}
+
+      {modalReaff && (
+        <ModalReaffecter
+          destination={modalReaff}
+          allBudgets={budgets}
+          onClose={() => setModalReaff(null)}
+          onSave={msg => { setMsgReaff(msg); setTimeout(() => setMsgReaff(''), 6000); fetchBudgets() }}
         />
       )}
     </div>
