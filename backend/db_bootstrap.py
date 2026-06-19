@@ -24,21 +24,24 @@ def bootstrap_db(app):
                 "ALTER TABLE depense ADD COLUMN id_demandeur INTEGER REFERENCES utilisateur(id_utilisateur)",
                 "ALTER TABLE depense ADD COLUMN id_validateur INTEGER REFERENCES utilisateur(id_utilisateur)",
                 "ALTER TABLE depense ADD COLUMN id_caissier INTEGER REFERENCES utilisateur(id_utilisateur)",
-                "ALTER TABLE depense ADD COLUMN date_validation DATETIME",
-                "ALTER TABLE depense ADD COLUMN date_paiement_sortie DATETIME",
+                "ALTER TABLE depense ADD COLUMN date_validation TIMESTAMP",
+                "ALTER TABLE depense ADD COLUMN date_paiement_sortie TIMESTAMP",
                 # Sprint 9 — Laissez-passer
                 "ALTER TABLE autorisation_passage ADD COLUMN date_validite_lp DATE",
                 # Sprint 9 — Validation RAF des frais annexes
                 "ALTER TABLE frais_annexe ADD COLUMN motif_rejet VARCHAR(255)",
                 "ALTER TABLE frais_annexe ADD COLUMN id_validateur INTEGER REFERENCES utilisateur(id_utilisateur)",
-                "ALTER TABLE frais_annexe ADD COLUMN date_validation DATETIME",
+                "ALTER TABLE frais_annexe ADD COLUMN date_validation TIMESTAMP",
             ]:
                 try:
                     _conn.execute(db.text(_sql))
                     _conn.commit()
                     print(f"✅ Migration : {_sql.split('ADD COLUMN')[1].strip().split()[0]} ajouté")
                 except Exception:
-                    pass  # colonne déjà présente
+                    # colonne déjà présente — sur Postgres, l'échec laisse la transaction
+                    # avortée : sans rollback, TOUTES les instructions suivantes échoueraient
+                    # en cascade (contrairement à SQLite). Indispensable ici.
+                    _conn.rollback()
 
         # Migration données : reformater les matricules au format ISM{code}/DK-{seq:05d}
         try:
