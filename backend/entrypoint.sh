@@ -1,22 +1,10 @@
 #!/bin/sh
 set -e
 
-echo "==> Initialisation de la base de données..."
-python - <<'EOF'
-import subprocess, sys
-from app import create_app
-from extensions import db
-from models import Etudiant
-
-app = create_app()
-with app.app_context():
-    db.create_all()
-    if db.session.query(Etudiant).count() == 0:
-        print("==> Peuplement initial de la base...")
-        subprocess.run([sys.executable, 'seed.py'], check=True)
-    else:
-        print("==> Données déjà présentes, seed ignoré.")
-EOF
-
+# bootstrap_db() (appelé par wsgi.py) gère déjà la création des tables, les
+# migrations et le seed conditionnel. --preload garantit qu'il ne s'exécute
+# qu'une seule fois (dans le process maître), avant le fork des workers —
+# sans ce flag, les 2 workers l'exécuteraient chacun en parallèle au premier
+# démarrage, avec un risque de race condition sur une base vide.
 echo "==> Démarrage de gunicorn..."
-exec gunicorn wsgi:app --bind 0.0.0.0:5000 --workers 2 --timeout 120
+exec gunicorn wsgi:app --bind 0.0.0.0:5000 --workers 2 --timeout 120 --preload
