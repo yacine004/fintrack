@@ -1,5 +1,4 @@
 from flask import Flask
-from prometheus_flask_exporter import PrometheusMetrics
 from flask_cors import CORS
 from datetime import timedelta
 from dotenv import load_dotenv
