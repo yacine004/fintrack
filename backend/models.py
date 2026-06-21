@@ -199,6 +199,27 @@ class Budget(db.Model):
                 'date_creation': self.date_creation.strftime('%d/%m/%Y') if self.date_creation else ''}
 
 
+class BudgetAnnuel(db.Model):
+    """Statut de l'enveloppe budgétaire globale d'une année : une fois 'fixe',
+    plus aucune ligne ne peut être créée/modifiée/supprimée — seules les
+    réaffectations entre lignes existantes restent possibles."""
+    __tablename__ = 'budget_annuel'
+    id            = db.Column(db.Integer, primary_key=True)
+    annee         = db.Column(db.String(20), unique=True, nullable=False)
+    statut        = db.Column(db.String(20), nullable=False, default='brouillon')  # 'brouillon' | 'fixe'
+    id_raf        = db.Column(db.Integer, db.ForeignKey('utilisateur.id_utilisateur'), nullable=True)
+    date_fixation = db.Column(db.DateTime, nullable=True)
+    date_creation = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        raf = db.session.get(Utilisateur, self.id_raf) if self.id_raf else None
+        return {
+            'id': self.id, 'annee': self.annee, 'statut': self.statut,
+            'raf': f"{raf.prenom} {raf.nom}" if raf else '',
+            'date_fixation': self.date_fixation.strftime('%d/%m/%Y %H:%M') if self.date_fixation else None,
+        }
+
+
 class Notification(db.Model):
     __tablename__ = 'notification'
     id_notification = db.Column(db.Integer, primary_key=True)
@@ -447,4 +468,34 @@ class FraisAnnexe(db.Model):
             'date_creation':   self.date_creation.strftime('%d/%m/%Y %H:%M'),
             'date_validation': self.date_validation.strftime('%d/%m/%Y %H:%M') if self.date_validation else None,
             'date_paiement':   self.date_paiement.strftime('%d/%m/%Y %H:%M') if self.date_paiement else None,
+        }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SPRINT 9 — Échéancier de paiement configurable (barème par niveau, par année)
+# ══════════════════════════════════════════════════════════════════════════════
+class LigneEcheancier(db.Model):
+    """Une ligne du barème ISM pour un niveau donné, sur une année scolaire donnée.
+    decalage_annee : 0 = année de début de l'année académique (ex. sept-déc 2025),
+                      1 = année de fin (ex. jan-juin 2026)."""
+    __tablename__ = 'ligne_echeancier'
+    id             = db.Column(db.Integer, primary_key=True)
+    id_annee       = db.Column(db.Integer, db.ForeignKey('annee_scolaire.id'), nullable=False)
+    niveau         = db.Column(db.String(10), nullable=False)   # L1, L2, L3, M1, M2
+    type_ligne     = db.Column(db.String(20), nullable=False)   # 'inscription' | 'scolarite' | 'encadrement'
+    label          = db.Column(db.String(150), nullable=False)
+    mois           = db.Column(db.Integer, nullable=False)      # 1-12
+    jour           = db.Column(db.Integer, nullable=False, default=5)
+    decalage_annee = db.Column(db.Integer, nullable=False, default=0)  # 0 ou 1
+    montant        = db.Column(db.Numeric(15, 2), nullable=False)
+    ordre          = db.Column(db.Integer, nullable=False, default=0)
+    date_creation  = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id, 'id_annee': self.id_annee, 'niveau': self.niveau,
+            'type_ligne': self.type_ligne, 'label': self.label,
+            'mois': self.mois, 'jour': self.jour,
+            'decalage_annee': self.decalage_annee,
+            'montant': float(self.montant), 'ordre': self.ordre,
         }

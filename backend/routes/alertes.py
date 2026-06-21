@@ -3,63 +3,10 @@ from flask_jwt_extended import jwt_required
 from extensions import db, mail
 from models import Etudiant, Paiement, AnneeScolaire
 from datetime import date
+from bareme import get_niveau as _get_niveau, echeancier_par_annee_libelle as _echeancier
 import io
 
 alertes_bp = Blueprint('alertes', __name__)
-
-
-# ── Barème ISM (miroir du frontend) ──────────────────────────────────────────
-def _get_niveau(classe):
-    c = (classe or '').upper()
-    if 'M2' in c: return 'M2'
-    if 'M1' in c: return 'M1'
-    if 'L3' in c: return 'L3'
-    if 'L2' in c: return 'L2'
-    return 'L1'
-
-
-def _echeancier(niveau, annee):
-    try:
-        debut = int(annee.split('-')[0])
-    except Exception:
-        debut = 2025
-    fin = debut + 1
-    frais = 100000 if niveau == 'M1' else 97500 if niveau == 'M2' else 92500 if niveau == 'L3' else 95000
-
-    # Droits d'inscription : dates différentes Licence (sept/oct/fév/mars) vs Master (oct/nov/mars/avril)
-    if niveau in ('M1', 'M2'):
-        items = [
-            (date(debut, 10, 5), 112500, "Tranche 1/4 inscription"),
-            (date(debut, 11, 5), 112500, "Tranche 2/4 inscription"),
-            (date(fin,   3,  5), 112500, "Tranche 3/4 inscription"),
-            (date(fin,   4,  5), 112500, "Tranche 4/4 inscription"),
-        ]
-    else:
-        items = [
-            (date(debut, 9,  5), 112500, "Tranche 1/4 inscription"),
-            (date(debut, 10, 5), 112500, "Tranche 2/4 inscription"),
-            (date(fin,   2,  5), 112500, "Tranche 3/4 inscription"),
-            (date(fin,   3,  5), 112500, "Tranche 4/4 inscription"),
-        ]
-
-    items += [
-        (date(debut, 9,  5), frais,  "Mensualité Septembre"),
-        (date(debut, 10, 5), frais,  "Mensualité Octobre"),
-        (date(debut, 11, 5), frais,  "Mensualité Novembre"),
-        (date(debut, 12, 5), frais,  "Mensualité Décembre"),
-        (date(fin,   1,  5), frais,  "Mensualité Janvier"),
-        (date(fin,   2,  5), frais,  "Mensualité Février"),
-        (date(fin,   3,  5), frais,  "Mensualité Mars"),
-        (date(fin,   4,  5), frais,  "Mensualité Avril"),
-        (date(fin,   5,  5), frais,  "Mensualité Mai"),
-        (date(fin,   6,  5), frais,  "Mensualité Juin"),
-    ]
-    # Frais d'encadrement et de soutenance de mémoire : 25 000 FCFA, L3 et M2 uniquement
-    if niveau == 'L3':
-        items.append((date(fin, 3, 5), 25000, "Frais d'encadrement et de soutenance"))
-    elif niveau == 'M2':
-        items.append((date(fin, 5, 5), 25000, "Frais d'encadrement et de soutenance"))
-    return items
 
 
 def _calcul_retard(etudiant, total_paye, today=None):

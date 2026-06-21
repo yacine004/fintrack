@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Sidebar from '../../components/Sidebar'
-import ModalEcheancier, { ModalPaiement, genererEcheancier, getNiveau } from '../../components/ModalEcheancier'
+import ModalEcheancier, { ModalPaiement, genererEcheancier, getNiveau, fetchBareme } from '../../components/ModalEcheancier'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const getHeaders = () => ({
@@ -165,6 +165,14 @@ function TabEtudiants({ etudiants, setSelectedEtu }) {
     M2: { bg: '#DCFCE7', color: '#15803D' },
   }
 
+  // Barème regroupé par année académique (les étudiants affichés peuvent appartenir à des années différentes)
+  const [baremeParAnnee, setBaremeParAnnee] = useState({})
+  useEffect(() => {
+    const annees = [...new Set(etudiants.map(e => e.annee_academique).filter(Boolean))]
+    Promise.all(annees.map(a => fetchBareme(a).then(b => [a, b])))
+      .then(pairs => setBaremeParAnnee(Object.fromEntries(pairs)))
+  }, [etudiants])
+
   if (etudiants.length === 0) {
     return (
       <div className="ft-empty ft-card" style={{ padding: '60px 20px' }}>
@@ -189,7 +197,7 @@ function TabEtudiants({ etudiants, setSelectedEtu }) {
         <tbody>
           {etudiants.map((e, i) => {
             const niv  = getNiveau(e.classe)
-            const ech  = genererEcheancier(niv)
+            const ech  = genererEcheancier(niv, baremeParAnnee[e.annee_academique])
             const nc   = NIVEAU_STYLE[niv] || NIVEAU_STYLE.L1
             return (
               <tr key={e.id} className="ft-tr"

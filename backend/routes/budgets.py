@@ -2,10 +2,19 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
 from functools import wraps
 from extensions import db
-from models import Budget
+from models import Budget, BudgetAnnuel
 from datetime import datetime
 
 budgets_bp = Blueprint('budgets', __name__)
+
+
+def _budget_annuel(annee):
+    return db.session.query(BudgetAnnuel).filter_by(annee=annee).first()
+
+
+def _est_fixe(annee):
+    ba = _budget_annuel(annee)
+    return ba is not None and ba.statut == 'fixe'
 
 
 def raf_required(fn):
@@ -53,6 +62,8 @@ def lister():
     total_consomme = sum(float(b.montant_consomme) for b in budgets)
     nb_depasses    = sum(1 for b in budgets if float(b.montant_consomme) >= float(b.montant_alloue))
 
+    ba = _budget_annuel(annee)
+
     return jsonify({
         'budgets': result,
         'kpis': {
@@ -60,8 +71,50 @@ def lister():
             'total_consomme': total_consomme,
             'nb_depasses':    nb_depasses,
             'taux_global':    round((total_consomme / total_alloue) * 100, 1) if total_alloue > 0 else 0
-        }
+        },
+        'budget_annuel': ba.to_dict() if ba else {'annee': annee, 'statut': 'brouillon'},
     }), 200
+
+
+# ── FIXER le budget de l'année (RAF uniquement) ───────────────────────────────
+@budgets_bp.route('/fixer', methods=['POST'])
+@raf_required
+def fixer():
+    data  = request.get_json()
+    annee = (data.get('annee') or '').strip()
+    if not annee:
+        return jsonify({'message': 'Année obligatoire'}), 400
+
+    if db.session.query(Budget).filter_by(annee=annee).count() == 0:
+        return jsonify({'message': f'Aucune ligne budgétaire à fixer pour {annee}'}), 400
+
+    identity = get_jwt().get('user', {})
+    ba = _budget_annuel(annee)
+    if not ba:
+        ba = BudgetAnnuel(annee=annee)
+        db.session.add(ba)
+    ba.statut        = 'fixe'
+    ba.id_raf        = identity.get('id')
+    ba.date_fixation = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'message': f'Budget {annee} fixé — seules les réaffectations restent possibles', 'budget_annuel': ba.to_dict()}), 200
+
+
+# ── ANNULER la fixation (RAF uniquement) ──────────────────────────────────────
+@budgets_bp.route('/devalider', methods=['POST'])
+@raf_required
+def devalider():
+    data  = request.get_json()
+    annee = (data.get('annee') or '').strip()
+    ba = _budget_annuel(annee)
+    if not ba or ba.statut != 'fixe':
+        return jsonify({'message': f'Le budget {annee} n\'est pas fixé'}), 400
+
+    ba.statut        = 'brouillon'
+    ba.date_fixation = None
+    db.session.commit()
+    return jsonify({'message': f'Fixation du budget {annee} annulée — modifications de nouveau possibles', 'budget_annuel': ba.to_dict()}), 200
 
 
 # ── CRÉER un budget (RAF uniquement) ──────────────────────────────────────────
@@ -76,6 +129,9 @@ def creer():
 
     if not all([categorie, montant_alloue]):
         return jsonify({'message': 'Catégorie et montant alloué sont obligatoires'}), 400
+
+    if _est_fixe(annee):
+        return jsonify({'message': f'Le budget {annee} est fixé — impossible de créer une nouvelle ligne. Utilisez une réaffectation.'}), 400
 
     try:
         montant_alloue = float(montant_alloue)
@@ -115,6 +171,8 @@ def modifier(bid):
     data = request.get_json()
 
     if 'montant_alloue' in data:
+        if _est_fixe(budget.annee):
+            return jsonify({'message': f'Le budget {budget.annee} est fixé — modifiez le montant via une réaffectation, pas une édition directe.'}), 400
         try:
             montant = float(data['montant_alloue'])
             if montant <= 0:
@@ -188,6 +246,8 @@ def supprimer(bid):
     budget = db.session.get(Budget, bid)
     if not budget:
         return jsonify({'message': 'Budget introuvable'}), 404
+    if _est_fixe(budget.annee):
+        return jsonify({'message': f'Le budget {budget.annee} est fixé — suppression impossible.'}), 400
 
     db.session.delete(budget)
     db.session.commit()

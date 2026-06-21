@@ -230,45 +230,14 @@ def stats():
 
 
 # ── PORTAIL PUBLIC : suivi paiements par matricule (sans JWT) ─────────────────
-# Barème ISM 2025-2026 (identique à ModalEcheancier.jsx)
-def _get_niveau(classe):
-    c = (classe or '').upper()
-    if 'M2' in c: return 'M2'
-    if 'M1' in c: return 'M1'
-    if 'L3' in c: return 'L3'
-    if 'L2' in c: return 'L2'
-    return 'L1'
+from bareme import get_niveau as _get_niveau, echeancier_par_annee_libelle as _echeancier_bareme
 
-def _generer_echeancier(classe):
-    from datetime import date as _date
+def _generer_echeancier(classe, annee_academique):
+    """Échéancier d'un étudiant à partir du barème configuré en base pour son
+    année académique réelle (et non plus une année 2025 codée en dur)."""
     niveau = _get_niveau(classe)
-    frais_mensuel = 100_000 if niveau == 'M1' else 97_500 if niveau == 'M2' else 92_500 if niveau == 'L3' else 95_000
-    an = 2025
-    # Droits d'inscription : dates différentes Licence (sept/oct/fév/mars) vs Master (oct/nov/mars/avril)
-    if niveau in ('M1', 'M2'):
-        inscription = [
-            {'date': _date(an,   10, 5), 'montant': 112_500},
-            {'date': _date(an,   11, 5), 'montant': 112_500},
-            {'date': _date(an+1, 3,  5), 'montant': 112_500},
-            {'date': _date(an+1, 4,  5), 'montant': 112_500},
-        ]
-    else:
-        inscription = [
-            {'date': _date(an,   9, 5), 'montant': 112_500},
-            {'date': _date(an,  10, 5), 'montant': 112_500},
-            {'date': _date(an+1, 2, 5), 'montant': 112_500},
-            {'date': _date(an+1, 3, 5), 'montant': 112_500},
-        ]
-    mois = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6]
-    scolarite = [{'date': _date(an if m >= 9 else an+1, m, 5), 'montant': frais_mensuel} for m in mois]
-    # Frais d'encadrement et de soutenance de mémoire : 25 000 FCFA, L3 et M2 uniquement
-    if niveau == 'L3':
-        encadrement = [{'date': _date(an+1, 3, 5), 'montant': 25_000}]
-    elif niveau == 'M2':
-        encadrement = [{'date': _date(an+1, 5, 5), 'montant': 25_000}]
-    else:
-        encadrement = []
-    items = inscription + scolarite + encadrement
+    items_tuples = _echeancier_bareme(niveau, annee_academique)
+    items = [{'date': d, 'montant': m} for d, m, _label in items_tuples]
     return items, sum(i['montant'] for i in items)
 
 def _est_a_jour(items, total_paye):
@@ -297,7 +266,7 @@ def suivi_paiements():
                  .order_by(Paiement.date_paiement.asc())
                  .all())
 
-    echeancier_items, tarif_annuel = _generer_echeancier(etudiant.classe)
+    echeancier_items, tarif_annuel = _generer_echeancier(etudiant.classe, etudiant.annee_academique)
     total_paye    = sum(float(p.montant) for p in paiements)
     solde_restant = max(0.0, tarif_annuel - total_paye)
     a_jour        = _est_a_jour(echeancier_items, total_paye)

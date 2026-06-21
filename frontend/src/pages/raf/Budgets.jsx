@@ -233,18 +233,22 @@ function ModalReaffecter({ destination, allBudgets, onClose, onSave }) {
 export default function RafBudgets() {
   const [budgets, setBudgets] = useState([])
   const [kpis, setKpis]       = useState({ total_alloue: 0, total_consomme: 0, nb_depasses: 0, taux_global: 0 })
+  const [budgetAnnuel, setBudgetAnnuel] = useState({ statut: 'brouillon' })
   const [loading, setLoading] = useState(true)
   const [annee, setAnnee]     = useState(new Date().getFullYear().toString())
   const [modal, setModal]     = useState(null)
   const [modalReaff, setModalReaff] = useState(null)
   const [msgReaff,   setMsgReaff]   = useState('')
+  const [msgFixation, setMsgFixation] = useState('')
+
+  const estFixe = budgetAnnuel.statut === 'fixe'
 
   const fetchBudgets = useCallback(async () => {
     setLoading(true)
     try {
       const res  = await fetch(`${API}/budgets?annee=${annee}`, { headers: getHeaders() })
       const data = await res.json()
-      if (res.ok) { setBudgets(data.budgets); setKpis(data.kpis) }
+      if (res.ok) { setBudgets(data.budgets); setKpis(data.kpis); setBudgetAnnuel(data.budget_annuel) }
     } catch { /* empty */ }
     finally { setLoading(false) }
   }, [annee])
@@ -255,9 +259,31 @@ export default function RafBudgets() {
   const handleSupprimer = async (id) => {
     if (!confirm('Supprimer ce budget ?')) return
     try {
-      const res = await fetch(`${API}/budgets/${id}`, { method: 'DELETE', headers: getHeaders() })
+      const res  = await fetch(`${API}/budgets/${id}`, { method: 'DELETE', headers: getHeaders() })
+      const data = await res.json()
       if (res.ok) fetchBudgets()
+      else alert(data.message)
     } catch { /* empty */ }
+  }
+
+  const handleFixer = async () => {
+    if (!confirm(`Fixer définitivement le budget ${annee} ? Plus aucune nouvelle ligne ne pourra être créée — seules les réaffectations resteront possibles.`)) return
+    setMsgFixation('')
+    const res  = await fetch(`${API}/budgets/fixer`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ annee }) })
+    const data = await res.json()
+    if (!res.ok) { setMsgFixation('❌ ' + data.message); return }
+    setMsgFixation('✓ ' + data.message)
+    fetchBudgets()
+  }
+
+  const handleDevalider = async () => {
+    if (!confirm(`Annuler la fixation du budget ${annee} ?`)) return
+    setMsgFixation('')
+    const res  = await fetch(`${API}/budgets/devalider`, { method: 'POST', headers: getHeaders(), body: JSON.stringify({ annee }) })
+    const data = await res.json()
+    if (!res.ok) { setMsgFixation('❌ ' + data.message); return }
+    setMsgFixation('✓ ' + data.message)
+    fetchBudgets()
   }
 
   const getBarColor = (taux) => {
@@ -277,11 +303,22 @@ export default function RafBudgets() {
       <Sidebar />
       <div style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: '26px', fontWeight: '800', color: '#1B3A6B' }}>📊 Contrôle Budgétaire</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <h1 style={{ margin: 0, fontSize: '26px', fontWeight: '800', color: '#1B3A6B' }}>📊 Contrôle Budgétaire</h1>
+              <span style={{
+                padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
+                background: estFixe ? '#EFF6FF' : '#FFFBEB',
+                color:      estFixe ? '#1D4ED8' : '#B45309',
+                border: `1px solid ${estFixe ? '#BFDBFE' : '#FDE68A'}`,
+              }}>
+                {estFixe ? '🔒 Budget fixé' : '✏️ Brouillon'}
+              </span>
+            </div>
             <p style={{ margin: '4px 0 0', color: '#64748B', fontSize: '14px' }}>
               Suivi des enveloppes budgétaires — Année {annee}
+              {estFixe && ' · seules les réaffectations sont possibles'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -289,13 +326,34 @@ export default function RafBudgets() {
               style={{ padding: '9px 14px', border: '1.5px solid #E2E8F0', borderRadius: '8px', fontSize: '14px', outline: 'none' }}>
               {['2024', '2025', '2026', '2027'].map(a => <option key={a} value={a}>{a}</option>)}
             </select>
-            <button onClick={() => setModal('creer')}
-              style={{ padding: '11px 22px', background: '#1B3A6B', color: '#fff',
-                border: 'none', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
+            {estFixe ? (
+              <button onClick={handleDevalider}
+                style={{ padding: '11px 18px', background: '#fff', color: '#DC2626',
+                  border: '1.5px solid #FECACA', borderRadius: '10px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}>
+                🔓 Annuler la fixation
+              </button>
+            ) : (
+              <button onClick={handleFixer} disabled={budgets.length === 0}
+                style={{ padding: '11px 18px', background: budgets.length === 0 ? '#94A3B8' : '#fff', color: budgets.length === 0 ? '#fff' : '#1D4ED8',
+                  border: '1.5px solid #BFDBFE', borderRadius: '10px', cursor: budgets.length === 0 ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '600' }}>
+                🔒 Fixer le budget
+              </button>
+            )}
+            <button onClick={() => setModal('creer')} disabled={estFixe}
+              style={{ padding: '11px 22px', background: estFixe ? '#CBD5E1' : '#1B3A6B', color: '#fff',
+                border: 'none', borderRadius: '10px', cursor: estFixe ? 'not-allowed' : 'pointer', fontSize: '14px', fontWeight: '600' }}>
               ＋ Nouveau budget
             </button>
           </div>
         </div>
+
+        {msgFixation && (
+          <div style={{ padding: '10px 16px', marginBottom: '16px', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
+            background: msgFixation.startsWith('❌') ? '#FEF2F2' : '#F0FDF4',
+            color:      msgFixation.startsWith('❌') ? '#DC2626' : '#16A34A' }}>
+            {msgFixation}
+          </div>
+        )}
 
         {/* KPIs globaux */}
         <div style={{ display: 'flex', gap: '16px', marginBottom: '24px' }}>
@@ -386,20 +444,22 @@ export default function RafBudgets() {
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          <button onClick={() => setModal(b)}
-                            style={{ padding: '5px 10px', background: '#EFF6FF', color: '#2563EB',
-                              border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✏️</button>
-                          {(b.alerte === 'depasse' || b.alerte === 'attention') && (
-                            <button onClick={() => { setMsgReaff(''); setModalReaff(b) }}
-                              title="Réaffecter depuis un autre budget"
-                              style={{ padding: '5px 10px', background: '#FFF7ED', color: '#D97706',
-                                border: '1px solid #FDE68A', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
-                              ↔
-                            </button>
+                          {!estFixe && (
+                            <button onClick={() => setModal(b)}
+                              style={{ padding: '5px 10px', background: '#EFF6FF', color: '#2563EB',
+                                border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>✏️</button>
                           )}
-                          <button onClick={() => handleSupprimer(b.id)}
-                            style={{ padding: '5px 10px', background: '#FEF2F2', color: '#DC2626',
-                              border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>🗑️</button>
+                          <button onClick={() => { setMsgReaff(''); setModalReaff(b) }}
+                            title="Réaffecter depuis un autre budget"
+                            style={{ padding: '5px 10px', background: '#FFF7ED', color: '#D97706',
+                              border: '1px solid #FDE68A', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '700' }}>
+                            ↔
+                          </button>
+                          {!estFixe && (
+                            <button onClick={() => handleSupprimer(b.id)}
+                              style={{ padding: '5px 10px', background: '#FEF2F2', color: '#DC2626',
+                                border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}>🗑️</button>
+                          )}
                         </div>
                       </td>
                     </tr>

@@ -7,7 +7,7 @@ const getHeaders = () => ({
   Authorization: `Bearer ${localStorage.getItem('token')}`
 })
 
-// ── Helpers barème ISM 2025-2026 ──────────────────────────────────────────────
+// ── Helpers barème ISM (configurable, géré dans Paramétrage → Échéancier) ────
 
 export function getNiveau(classe) {
   const c = (classe || '').toUpperCase()
@@ -18,52 +18,53 @@ export function getNiveau(classe) {
   return 'L1'
 }
 
-export function genererEcheancier(niveau) {
-  const fraisMensuel = niveau === 'M1' ? 100000 : niveau === 'M2' ? 97500 : niveau === 'L3' ? 92500 : 95000
-  const isMaster = niveau === 'M1' || niveau === 'M2'
+const _baremeCache = new Map()
 
-  // Droits d'inscription : dates différentes Licence (sept/oct/fév/mars) vs Master (oct/nov/mars/avril)
-  const inscription = isMaster ? [
-    { key: 'ins1', date: new Date(2025, 9,  5), label: "Tranche 1/4 — Droits d'inscription", montant: 112500 },
-    { key: 'ins2', date: new Date(2025, 10, 5), label: "Tranche 2/4 — Droits d'inscription", montant: 112500 },
-    { key: 'ins3', date: new Date(2026, 2,  5), label: "Tranche 3/4 — Droits d'inscription", montant: 112500 },
-    { key: 'ins4', date: new Date(2026, 3,  5), label: "Tranche 4/4 — Droits d'inscription", montant: 112500 },
-  ] : [
-    { key: 'ins1', date: new Date(2025, 8,  5), label: "Tranche 1/4 — Droits d'inscription", montant: 112500 },
-    { key: 'ins2', date: new Date(2025, 9,  5), label: "Tranche 2/4 — Droits d'inscription", montant: 112500 },
-    { key: 'ins3', date: new Date(2026, 1,  5), label: "Tranche 3/4 — Droits d'inscription", montant: 112500 },
-    { key: 'ins4', date: new Date(2026, 2,  5), label: "Tranche 4/4 — Droits d'inscription", montant: 112500 },
-  ]
+/** Récupère le barème complet (tous niveaux) configuré pour une année scolaire.
+ * Mis en cache par année pour éviter de refetch à chaque rendu — le barème ne
+ * change pas pendant une session, sauf modification volontaire par le RAF. */
+export async function fetchBareme(annee) {
+  if (!annee) return null
+  if (_baremeCache.has(annee)) return _baremeCache.get(annee)
+  try {
+    const res  = await fetch(`${API}/echeancier/bareme?annee=${encodeURIComponent(annee)}`, { headers: getHeaders() })
+    const data = await res.json()
+    if (res.ok) { _baremeCache.set(annee, data.niveaux); return data.niveaux }
+  } catch { /* ignore */ }
+  return null
+}
 
-  const moisData = [
-    ['Septembre 2025', new Date(2025, 8,  5)],
-    ['Octobre 2025',   new Date(2025, 9,  5)],
-    ['Novembre 2025',  new Date(2025, 10, 5)],
-    ['Décembre 2025',  new Date(2025, 11, 5)],
-    ['Janvier 2026',   new Date(2026, 0,  5)],
-    ['Février 2026',   new Date(2026, 1,  5)],
-    ['Mars 2026',      new Date(2026, 2,  5)],
-    ['Avril 2026',     new Date(2026, 3,  5)],
-    ['Mai 2026',       new Date(2026, 4,  5)],
-    ['Juin 2026',      new Date(2026, 5,  5)],
-  ]
-  const scolarite = moisData.map(([mois, date], i) => ({
-    key: `sc${i + 1}`, date, label: `Mensualité — ${mois}`, montant: fraisMensuel
-  }))
+/** Invalide le cache (à appeler après modification du barème dans Paramétrage). */
+export function invaliderCacheBareme(annee) {
+  if (annee) _baremeCache.delete(annee)
+  else _baremeCache.clear()
+}
 
-  // Frais d'encadrement et de soutenance de mémoire : 25 000 FCFA, L3 et M2 uniquement
-  const encadrement = niveau === 'L3' ? [
-    { key: 'enc1', date: new Date(2026, 2, 5), label: "Frais d'encadrement et de soutenance de mémoire", montant: 25000 },
-  ] : niveau === 'M2' ? [
-    { key: 'enc1', date: new Date(2026, 4, 5), label: "Frais d'encadrement et de soutenance de mémoire", montant: 25000 },
-  ] : []
+const ECHEANCIER_VIDE = {
+  inscription: [], scolarite: [], encadrement: [],
+  totalInscription: 0, totalScolarite: 0, totalEncadrement: 0, totalAnnuel: 0,
+  niveau: null, fraisMensuel: 0,
+}
 
-  const totalInscription = 4 * 112500
-  const totalScolarite   = 10 * fraisMensuel
-  const totalEncadrement = (niveau === 'L3' || niveau === 'M2') ? 25000 : 0
-  const totalAnnuel      = totalInscription + totalScolarite + totalEncadrement
+/** Construit l'échéancier d'un niveau à partir du barème déjà récupéré via
+ * fetchBareme(annee). Retourne un échéancier vide (et non une erreur) si le
+ * barème n'est pas encore chargé ou si aucune ligne n'est configurée. */
+export function genererEcheancier(niveau, bareme) {
+  const data = bareme?.[niveau]
+  if (!data) return { ...ECHEANCIER_VIDE, niveau }
 
-  return { inscription, scolarite, encadrement, totalInscription, totalScolarite, totalEncadrement, totalAnnuel, niveau, fraisMensuel }
+  const toDate = (items) => items.map(i => ({ ...i, date: new Date(i.date + 'T00:00:00') }))
+  return {
+    inscription: toDate(data.inscription),
+    scolarite:   toDate(data.scolarite),
+    encadrement: toDate(data.encadrement),
+    totalInscription: data.totalInscription,
+    totalScolarite:   data.totalScolarite,
+    totalEncadrement: data.totalEncadrement,
+    totalAnnuel:      data.totalAnnuel,
+    niveau,
+    fraisMensuel: data.fraisMensuel,
+  }
 }
 
 export function calculerStatuts(echeancier, totalPaye) {
@@ -176,9 +177,16 @@ export function ModalPaiement({ defaultEtudiant, paiementsInitiaux, caisses, onC
     await chargerPaiements(etu.id, etu.annee_academique)
   }
 
+  // Barème de l'année académique de l'étudiant sélectionné
+  const [bareme, setBareme] = useState(null)
+  useEffect(() => {
+    if (!etudiant?.annee_academique) return
+    fetchBareme(etudiant.annee_academique).then(setBareme)
+  }, [etudiant?.annee_academique])
+
   // Calculs échéancier
   const niveau     = etudiant ? getNiveau(etudiant.classe) : 'L1'
-  const ech        = genererEcheancier(niveau)
+  const ech        = genererEcheancier(niveau, bareme)
   const totalPaye  = paiementsEtu.reduce((s, p) => s + parseFloat(p.montant), 0)
   const statuts    = etudiant ? calculerStatuts(ech, totalPaye) : {}
   const allItems   = [...ech.inscription, ...ech.scolarite, ...ech.encadrement]
@@ -545,8 +553,14 @@ export default function ModalEcheancier({ etudiant, caisses, etudiants, onClose,
   // eslint-disable-next-line
   useEffect(() => { chargerPaiements() }, [chargerPaiements])
 
+  const [bareme, setBareme] = useState(null)
+  useEffect(() => {
+    if (!etudiant.annee_academique) return
+    fetchBareme(etudiant.annee_academique).then(setBareme)
+  }, [etudiant.annee_academique])
+
   const niveau      = getNiveau(etudiant.classe)
-  const echeancier  = genererEcheancier(niveau)
+  const echeancier  = genererEcheancier(niveau, bareme)
   const totalPaye   = paiementsEtu.reduce((s, p) => s + parseFloat(p.montant), 0)
   const statuts     = calculerStatuts(echeancier, totalPaye)
   const resteAPayer = Math.max(0, echeancier.totalAnnuel - totalPaye)

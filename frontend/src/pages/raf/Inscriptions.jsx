@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import Sidebar from '../../components/Sidebar'
-import { genererEcheancier, getNiveau, calculerStatuts } from '../../components/ModalEcheancier'
+import { genererEcheancier, getNiveau, calculerStatuts, fetchBareme } from '../../components/ModalEcheancier'
 import PhoneInput from '../../components/PhoneInput'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
@@ -80,8 +80,8 @@ function Field({ label, children }) {
 
 // ── Sous-composant : EcheancierInitial ───────────────────────────────────────
 // Affiche l'échéancier au moment de l'inscription avec sélection + montants partiels
-function EcheancierInitial({ niveau, selectedAmounts, onToggle, onSetAmount }) {
-  const ech = genererEcheancier(niveau)
+function EcheancierInitial({ niveau, bareme, selectedAmounts, onToggle, onSetAmount }) {
+  const ech = genererEcheancier(niveau, bareme)
 
   const renderGroup = (items, titre) => (
     <div style={{ marginBottom: '12px' }}>
@@ -201,6 +201,9 @@ function OngletInscription({ caisses }) {
   const [success, setSuccess]  = useState(null)
 
   const niveau = getNiveau(form.classe)
+
+  const [bareme, setBareme] = useState(null)
+  useEffect(() => { fetchBareme(annee).then(setBareme) }, [annee])
 
   const genererMatricule = useCallback(async () => {
     setLoadingMat(true)
@@ -373,6 +376,7 @@ function OngletInscription({ caisses }) {
       <Section title={`Échéancier ${annee} — Niveau ${niveau} (paiements optionnels à l'inscription)`}>
         <EcheancierInitial
           niveau={niveau}
+          bareme={bareme}
           selectedAmounts={selectedAmounts}
           onToggle={toggleKey}
           onSetAmount={setAmount}
@@ -491,6 +495,12 @@ function OngletReinscription({ caisses }) {
 
   const montantTotal = [...selectedAmounts.values()].reduce((s, v) => s + (parseInt(v, 10) || 0), 0)
   const niveau       = getNiveau(nouvelleClasse)
+
+  // Barème de la nouvelle année (pour l'échéancier proposé) et de l'année actuelle de l'étudiant (pour ses arriérés)
+  const [baremeNouvelle, setBaremeNouvelle] = useState(null)
+  const [baremeActuel,   setBaremeActuel]   = useState(null)
+  useEffect(() => { fetchBareme(nouvelleAnnee).then(setBaremeNouvelle) }, [nouvelleAnnee])
+  useEffect(() => { if (etudiant?.annee_academique) fetchBareme(etudiant.annee_academique).then(setBaremeActuel) }, [etudiant?.annee_academique])
 
   const valider = async () => {
     setErreur('')
@@ -658,6 +668,7 @@ function OngletReinscription({ caisses }) {
             <Section title={`Échéancier ${nouvelleAnnee} — Niveau ${niveau} (paiements optionnels)`}>
               <EcheancierInitial
                 niveau={niveau}
+                bareme={baremeNouvelle}
                 selectedAmounts={selectedAmounts}
                 onToggle={toggleKey}
                 onSetAmount={setAmount}
@@ -708,7 +719,7 @@ function OngletReinscription({ caisses }) {
           {(() => {
             // Calcul des arriérés de l'année en cours
             const niveauAct  = getNiveau(etudiant.classe)
-            const echAct     = genererEcheancier(niveauAct)
+            const echAct     = genererEcheancier(niveauAct, baremeActuel)
             const statutsAct = calculerStatuts(echAct, totalPaye)
             const allItems   = [...echAct.inscription, ...echAct.scolarite, ...echAct.encadrement]
             // Montant des items 'du' non couverts

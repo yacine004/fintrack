@@ -97,6 +97,14 @@ def bootstrap_db(app):
             db.session.commit()
             print("✅ Config par défaut : ref_prefixe=FT")
 
+        # Seed barème ISM (échéancier configurable) pour chaque année sans lignes encore définies
+        from models import LigneEcheancier
+        from bareme import seed_bareme_defaut
+        for _annee in db.session.query(AnneeScolaire).all():
+            if db.session.query(LigneEcheancier).filter_by(id_annee=_annee.id).count() == 0:
+                _n = seed_bareme_defaut(_annee.id)
+                print(f"✅ Barème ISM seedé pour {_annee.libelle} : {_n} lignes")
+
         from models import Utilisateur
         if db.session.query(Utilisateur).count() == 0:
             users = [

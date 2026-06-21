@@ -1,9 +1,9 @@
 from flask import Flask
 from flask_cors import CORS
-from datetime import timedelta
-from dotenv import load_dotenv
+from datetime import timedelta 
+from dotenv import load_dotenv 
 import os
-from prometheus_flask_exporter import PrometheusMetrics
+from prometheus_flask_exporter import PrometheusMetrics 
 
 load_dotenv()
 metrics = PrometheusMetrics(app=None)
@@ -31,6 +31,7 @@ from routes.alertes import alertes_bp
 from routes.autorisations import autorisations_bp
 # ── Sprint 9 ──
 from routes.frais_annexes import frais_annexes_bp
+from routes.echeancier import echeancier_bp
 
 
 def create_app():
@@ -87,6 +88,7 @@ def create_app():
     app.register_blueprint(alertes_bp,        url_prefix='/api/alertes')
     app.register_blueprint(autorisations_bp,  url_prefix='/api/autorisations')
     app.register_blueprint(frais_annexes_bp,  url_prefix='/api/frais-annexes')
+    app.register_blueprint(echeancier_bp,     url_prefix='/api/echeancier')
 
     return app
 
